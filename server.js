@@ -5,6 +5,8 @@ const connectDB = require("./config/db");
 
 const authRoutes = require("./routes/authRoutes");
 const profileRoutes = require("./routes/profileRoutes");
+const cropRoutes = require("./routes/cropRoutes");
+const expenseRoutes = require("./routes/expenseRoute");
 
 const app = express();
 
@@ -15,11 +17,13 @@ app.use(express.json());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
+app.use("/api/crops", cropRoutes);
+app.use("/api/expenses", expenseRoutes);
 
 app.get("/", (req, res) => {
-    res.send("Farmer App API Running 🌾");
+  res.send("Farmer App API Running 🌾");
 });
 
 app.listen(8000, () => {
-    console.log("Server running on port 8000");
+  console.log("Server running on port 8000");
 });
