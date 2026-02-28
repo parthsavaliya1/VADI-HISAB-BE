@@ -119,24 +119,25 @@ const ExpenseSchema = new mongoose.Schema(
 
 // ─── Pre-save: compute derived fields ────────────────────────────────────────
 
-ExpenseSchema.pre("save", function (next) {
+ExpenseSchema.pre("save", function () {
   if (this.seed && this.seed.quantityKg > 0) {
     this.seed.ratePerKg = +(this.seed.totalCost / this.seed.quantityKg).toFixed(
       2,
     );
   }
+
   if (this.labourDaily) {
     this.labourDaily.totalCost =
       this.labourDaily.numberOfPeople *
       this.labourDaily.days *
       this.labourDaily.dailyRate;
   }
+
   if (this.machinery) {
     this.machinery.totalCost = +(
       this.machinery.hoursOrAcres * this.machinery.rate
     ).toFixed(2);
   }
-  next();
 });
 
 module.exports = mongoose.model("Expense", ExpenseSchema);

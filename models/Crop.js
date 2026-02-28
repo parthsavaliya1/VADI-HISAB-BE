@@ -2,7 +2,6 @@ const mongoose = require("mongoose");
 
 const CropSchema = new mongoose.Schema(
   {
-    // ── Owner ──────────────────────────────────────────────────────────────
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -10,10 +9,16 @@ const CropSchema = new mongoose.Schema(
       index: true,
     },
 
-    // ── Season ────────────────────────────────────────────────────────────
+    // ── Season & Year ─────────────────────────────────────────────────────
     season: {
       type: String,
       enum: ["Kharif", "Rabi", "Summer"],
+    },
+    year: {
+      type: Number,
+      required: true,
+      default: () => new Date().getFullYear(),
+      index: true,
     },
 
     // ── Crop details ──────────────────────────────────────────────────────
@@ -28,6 +33,25 @@ const CropSchema = new mongoose.Schema(
       default: "🌱",
     },
 
+    // ── Sub Type (NEW) ────────────────────────────────────────────────────
+    // e.g. Garlic → "Desi", "Chinese", "Red"
+    // e.g. Wheat → "GW-496", "GW-322"
+    subType: {
+      type: String,
+      trim: true,
+      maxlength: [100, "Sub type cannot exceed 100 characters"],
+      default: "",
+    },
+
+    // ── Batch / Instance label (NEW) ──────────────────────────────────────
+    // Allows same crop twice in one year: "Batch 1", "Field A", "ખેતર નં.2"
+    batchLabel: {
+      type: String,
+      trim: true,
+      maxlength: [50],
+      default: "",
+    },
+
     // ── Land ──────────────────────────────────────────────────────────────
     area: {
       type: Number,
@@ -40,6 +64,16 @@ const CropSchema = new mongoose.Schema(
       default: "Bigha",
     },
 
+    // ── Dates (NEW) ───────────────────────────────────────────────────────
+    sowingDate: {
+      type: Date,
+      default: null,
+    },
+    harvestDate: {
+      type: Date,
+      default: null,
+    },
+
     // ── Status ────────────────────────────────────────────────────────────
     status: {
       type: String,
@@ -47,22 +81,24 @@ const CropSchema = new mongoose.Schema(
       default: "Active",
     },
 
-    // ── Extra ─────────────────────────────────────────────────────────────
     notes: {
       type: String,
       trim: true,
-      maxlength: [500, "Notes cannot exceed 500 characters"],
+      maxlength: [500],
       default: "",
     },
   },
   {
-    timestamps: true, // adds createdAt & updatedAt automatically
+    timestamps: true,
     toJSON: { virtuals: true },
   },
 );
 
 // ── Indexes ───────────────────────────────────────────────────────────────────
-CropSchema.index({ userId: 1, season: 1 });
+CropSchema.index({ userId: 1, year: 1 });
+CropSchema.index({ userId: 1, season: 1, year: 1 });
 CropSchema.index({ userId: 1, status: 1 });
+// Allows duplicate cropName in same year via different batchLabel
+CropSchema.index({ userId: 1, cropName: 1, year: 1, batchLabel: 1 });
 
 module.exports = mongoose.model("Crop", CropSchema);
