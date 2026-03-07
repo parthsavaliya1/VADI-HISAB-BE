@@ -13,7 +13,7 @@ router.post(
   auth,
   asyncHandler(async (req, res) => {
     const {
-      season, cropName, cropEmoji, subType, batchLabel, year,
+      season, cropName, cropEmoji, subType, batchLabel, farmName, year,
       area, areaUnit, sowingDate, harvestDate, status, notes,
     } = req.body;
 
@@ -33,6 +33,7 @@ router.post(
       crop_emoji: cropEmoji ?? "🌱",
       sub_type: subType ?? "",
       batch_label: batchLabel ?? "",
+      farm_name: farmName ?? null,
       year: financialYear,
       area: Number(area),
       area_unit: areaUnit ?? "Bigha",
@@ -314,14 +315,14 @@ router.put(
   auth,
   asyncHandler(async (req, res) => {
     const allowed = [
-      "season", "cropName", "cropEmoji", "subType", "batchLabel", "year",
+      "season", "cropName", "cropEmoji", "subType", "batchLabel", "farmName", "year",
       "area", "areaUnit", "sowingDate", "harvestDate", "status", "notes",
     ];
     const updates = {};
     const map = {
       cropName: "crop_name", cropEmoji: "crop_emoji", subType: "sub_type",
-      batchLabel: "batch_label", areaUnit: "area_unit", sowingDate: "sowing_date",
-      harvestDate: "harvest_date",
+      batchLabel: "batch_label", farmName: "farm_name", areaUnit: "area_unit",
+      sowingDate: "sowing_date", harvestDate: "harvest_date",
     };
     allowed.forEach((key) => {
       if (req.body[key] === undefined) return;

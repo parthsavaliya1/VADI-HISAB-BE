@@ -4,10 +4,22 @@ const auth = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
+/** Sum area of farms that are not lease (owned only) — lease does not count in total land */
+function totalLandFromFarms(farms) {
+  if (!Array.isArray(farms)) return 0;
+  return farms.reduce((sum, f) => {
+    if (f && (f.category === "lease" || f.category === "contract")) return sum;
+    return sum + (Number(f.area) || 0);
+  }, 0);
+}
+
 function profileToBody(rec) {
   const p = rec.get ? rec.get({ plain: true }) : rec;
   const waterSources = Array.isArray(p.water_sources) ? p.water_sources : [];
   const labourTypes = Array.isArray(p.labour_types) ? p.labour_types : [];
+  const farms = Array.isArray(p.farms) ? p.farms : [];
+  const totalFromOwned = totalLandFromFarms(farms);
+  const totalValue = totalFromOwned > 0 ? totalFromOwned : parseFloat(p.total_land_value) || 0;
   return {
     _id: p.id,
     user: p.user_id,
@@ -15,11 +27,12 @@ function profileToBody(rec) {
     district: p.district,
     taluka: p.taluka,
     village: p.village,
-    totalLand: { value: parseFloat(p.total_land_value), unit: p.total_land_unit || "bigha" },
+    totalLand: { value: totalValue, unit: p.total_land_unit || "bigha" },
     waterSources,
     tractorAvailable: p.tractor_available,
     implementsAvailable: p.implements_available || [],
     labourTypes,
+    farms,
     createdAt: p.created_at,
     updatedAt: p.updated_at,
   };
@@ -39,20 +52,24 @@ router.post("/complete", auth, async (req, res) => {
       taluka,
       village,
       totalLand,
+      farms,
       waterSources,
       tractorAvailable,
       implementsAvailable,
       labourTypes,
     } = req.body;
 
+    const farmsList = Array.isArray(farms) ? farms : [];
+    const totalOwned = totalLandFromFarms(farmsList);
     const profile = await FarmerProfile.create({
       user_id: req.user.id,
       name,
       district,
       taluka,
       village,
-      total_land_value: totalLand?.value ?? 0,
+      total_land_value: totalOwned > 0 ? totalOwned : (totalLand?.value ?? 0),
       total_land_unit: totalLand?.unit ?? "bigha",
+      farms: farmsList,
       water_sources: Array.isArray(waterSources) ? waterSources : [],
       tractor_available: tractorAvailable,
       implements_available: Array.isArray(implementsAvailable) ? implementsAvailable : [],
@@ -93,6 +110,10 @@ router.put("/update", auth, async (req, res) => {
     if (req.body.tractorAvailable !== undefined) updates.tractor_available = req.body.tractorAvailable;
     if (req.body.implementsAvailable !== undefined) updates.implements_available = Array.isArray(req.body.implementsAvailable) ? req.body.implementsAvailable : [];
     if (req.body.labourTypes !== undefined) updates.labour_types = Array.isArray(req.body.labourTypes) ? req.body.labourTypes : [];
+    if (req.body.farms !== undefined) {
+      updates.farms = Array.isArray(req.body.farms) ? req.body.farms : [];
+      updates.total_land_value = totalLandFromFarms(updates.farms);
+    }
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ message: "No valid fields provided to update." });
     }

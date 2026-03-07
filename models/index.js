@@ -45,6 +45,8 @@ const FarmerProfile = sequelize.define(
     tractor_available: { type: Sequelize.BOOLEAN, allowNull: false },
     implements_available: { type: Sequelize.JSONB, defaultValue: [] },
     labour_types: { type: Sequelize.JSONB, allowNull: false, defaultValue: [] },
+    /** Farms with name and area in bigha: [{ name: "vadi", area: 30 }, ...] */
+    farms: { type: Sequelize.JSONB, allowNull: true, defaultValue: [] },
   },
   { tableName: "farmer_profiles" }
 );
@@ -69,6 +71,8 @@ const Crop = sequelize.define(
     crop_emoji: { type: Sequelize.STRING(10), defaultValue: "🌱" },
     sub_type: { type: Sequelize.STRING(100), defaultValue: "" },
     batch_label: { type: Sequelize.STRING(50), defaultValue: "" },
+    /** Farm name from profile (e.g. "vadi", "farm-2") for area validation */
+    farm_name: { type: Sequelize.STRING(80), allowNull: true, defaultValue: null },
     area: { type: Sequelize.DECIMAL(12, 2), allowNull: false },
     area_unit: { type: Sequelize.STRING(20), defaultValue: "Bigha" },
     sowing_date: { type: Sequelize.DATEONLY, defaultValue: null },
@@ -287,6 +291,7 @@ function mapCrop(row) {
   o.cropEmoji = o.cropEmoji ?? row.crop_emoji;
   o.subType = o.subType ?? row.sub_type;
   o.batchLabel = o.batchLabel ?? row.batch_label;
+  o.farmName = o.farmName ?? row.farm_name;
   o.sowingDate = o.sowingDate ?? row.sowing_date;
   o.harvestDate = o.harvestDate ?? row.harvest_date;
   o.userId = o.userId ?? row.user_id;
