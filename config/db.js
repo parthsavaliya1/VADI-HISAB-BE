@@ -1,13 +1,17 @@
-const mongoose = require("mongoose");
+// PostgreSQL + Sequelize only (no Mongoose). If you see "mongoose" in errors, run: rm -rf node_modules package-lock.json && npm install
+const { sequelize } = require("../models");
 
 const connectDB = async () => {
-    try {
-        await mongoose.connect(process.env.MONGO_URI);
-        console.log("MongoDB Connected");
-    } catch (error) {
-        console.error(error);
-        process.exit(1);
-    }
+  try {
+    await sequelize.authenticate();
+    console.log("PostgreSQL connected");
+    // Auto-sync: creates tables if missing, alters existing tables to match models (e.g. after DB reset)
+    await sequelize.sync({ alter: true });
+    console.log("Database synced");
+  } catch (error) {
+    console.error("DB error:", error);
+    process.exit(1);
+  }
 };
 
 module.exports = connectDB;

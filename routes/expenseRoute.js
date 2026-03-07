@@ -1,142 +1,113 @@
 const express = require("express");
 const router = express.Router();
-const Expense = require("../models/Expense");
-// const auth = require("../middleware/auth"); // uncomment when auth is live
+const { Expense, mapExpense, sequelize } = require("../models");
+const auth = require("../middleware/authMiddleware");
+const { Op } = require("sequelize");
 
 const asyncHandler = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// POST /api/expenses  — Create a new expense
-// ─────────────────────────────────────────────────────────────────────────────
+function bodyToExpense(body, userId) {
+  const row = {
+    user_id: userId,
+    crop_id: body.cropId,
+    category: body.category,
+    date: body.date ?? new Date(),
+    notes: body.notes ?? "",
+    seed: body.seed ?? null,
+    fertilizer: body.fertilizer ?? null,
+    pesticide: body.pesticide ?? null,
+    labour_daily: body.labourDaily ?? null,
+    labour_contract: body.labourContract ?? null,
+    machinery: body.machinery ?? null,
+    irrigation: body.irrigation ?? null,
+    other: body.other ?? null,
+  };
+  return row;
+}
+
 router.post(
   "/",
-  // auth,
+  auth,
   asyncHandler(async (req, res) => {
-    const {
-      cropId,
-      category,
-      date,
-      notes,
-      seed,
-      fertilizer,
-      pesticide,
-      labourDaily,
-      labourContract,
-      machinery,
-    } = req.body;
-
-    console.log("Creating expense:", req.body);
-
+    const { cropId, category, date, notes, seed, fertilizer, pesticide, labourDaily, labourContract, machinery, irrigation, other } = req.body;
     if (!cropId || !category) {
-      return res.status(400).json({
-        success: false,
-        message: "cropId and category are required.",
-      });
+      return res.status(400).json({ success: false, message: "cropId and category are required." });
     }
-
-    const VALID_CATEGORIES = [
-      "Seed",
-      "Fertilizer",
-      "Pesticide",
-      "Labour",
-      "Machinery",
-    ];
+    const VALID_CATEGORIES = ["Seed", "Fertilizer", "Pesticide", "Labour", "Machinery", "Irrigation", "Other"];
     if (!VALID_CATEGORIES.includes(category)) {
-      return res.status(400).json({
-        success: false,
-        message: `category must be one of: ${VALID_CATEGORIES.join(", ")}`,
-      });
+      return res.status(400).json({ success: false, message: `category must be one of: ${VALID_CATEGORIES.join(", ")}` });
     }
-
-    const expenseData = {
-      userId: req.user?._id ?? req.body.userId,
-      cropId,
-      category,
-      date: date ?? new Date(),
-      notes: notes ?? "",
-    };
-
-    // Attach only the relevant sub-document
-    if (category === "Seed" && seed) expenseData.seed = seed;
-    if (category === "Fertilizer" && fertilizer)
-      expenseData.fertilizer = fertilizer;
-    if (category === "Pesticide" && pesticide)
-      expenseData.pesticide = pesticide;
-    if (category === "Labour") {
-      if (labourDaily) expenseData.labourDaily = labourDaily;
-      if (labourContract) expenseData.labourContract = labourContract;
-    }
-    if (category === "Machinery" && machinery)
-      expenseData.machinery = machinery;
-
-    const expense = await Expense.create(expenseData);
-    res.status(201).json({ success: true, data: expense });
-  }),
+    const expense = await Expense.create(bodyToExpense(req.body, req.user.id));
+    res.status(201).json({ success: true, data: mapExpense(expense) });
+  })
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/expenses  — Get all expenses
-// Query: ?cropId=xxx  ?category=Seed  ?page=1  ?limit=20
-// ─────────────────────────────────────────────────────────────────────────────
 router.get(
   "/",
-  // auth,
+  auth,
   asyncHandler(async (req, res) => {
-    const { cropId, category, page = 1, limit = 20 } = req.query;
+    const { cropId, category, year, page = 1, limit = 20 } = req.query;
+    const where = { user_id: req.user.id };
+    if (cropId) where.crop_id = cropId;
+    if (category) where.category = category;
+    if (year) where.year = Number(year);
 
-    const filter = {};
-    if (cropId) filter.cropId = cropId;
-    if (category) filter.category = category;
-
-    const skip = (Number(page) - 1) * Number(limit);
-    const total = await Expense.countDocuments(filter);
-    const expenses = await Expense.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit));
-
+    const { count, rows } = await Expense.findAndCountAll({
+      where,
+      order: [["date", "DESC"]],
+      offset: (Number(page) - 1) * Number(limit),
+      limit: Number(limit),
+    });
     res.json({
       success: true,
-      data: expenses,
-      pagination: {
-        total,
-        page: Number(page),
-        limit: Number(limit),
-        totalPages: Math.ceil(total / Number(limit)),
-      },
+      data: rows.map(mapExpense),
+      pagination: { total: count, page: Number(page), limit: Number(limit), totalPages: Math.ceil(count / Number(limit)) },
     });
-  }),
+  })
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/expenses/:id  — Get single expense
-// ─────────────────────────────────────────────────────────────────────────────
+router.get(
+  "/summary",
+  auth,
+  asyncHandler(async (req, res) => {
+    const { year, cropId } = req.query;
+    const where = { user_id: req.user.id };
+    if (year) where.year = Number(year);
+    if (cropId) where.crop_id = cropId;
+
+    const rows = await Expense.findAll({
+      attributes: ["category", [sequelize.fn("SUM", sequelize.col("amount")), "total"], [sequelize.fn("COUNT", sequelize.col("id")), "count"]],
+      where,
+      group: ["category"],
+      raw: true,
+    });
+    const summary = rows.map((r) => ({ _id: r.category, total: parseFloat(r.total) || 0, count: parseInt(r.count, 10) }));
+    summary.sort((a, b) => b.total - a.total);
+    const grandTotal = summary.reduce((acc, s) => acc + (s.total || 0), 0);
+    res.json({ success: true, year: year || "all", summary, grandTotal });
+  })
+);
+
 router.get(
   "/:id",
+  auth,
   asyncHandler(async (req, res) => {
-    const expense = await Expense.findById(req.params.id);
-    if (!expense)
-      return res
-        .status(404)
-        .json({ success: false, message: "Expense not found." });
-    res.json({ success: true, data: expense });
-  }),
+    const expense = await Expense.findOne({ where: { id: req.params.id, user_id: req.user.id } });
+    if (!expense) return res.status(404).json({ success: false, message: "Expense not found." });
+    res.json({ success: true, data: mapExpense(expense) });
+  })
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DELETE /api/expenses/:id  — Delete expense
-// ─────────────────────────────────────────────────────────────────────────────
 router.delete(
   "/:id",
+  auth,
   asyncHandler(async (req, res) => {
-    const expense = await Expense.findByIdAndDelete(req.params.id);
-    if (!expense)
-      return res
-        .status(404)
-        .json({ success: false, message: "Expense not found." });
+    const expense = await Expense.findOne({ where: { id: req.params.id, user_id: req.user.id } });
+    if (!expense) return res.status(404).json({ success: false, message: "Expense not found." });
+    await expense.destroy();
     res.json({ success: true, message: "Expense deleted successfully." });
-  }),
+  })
 );
 
 module.exports = router;
