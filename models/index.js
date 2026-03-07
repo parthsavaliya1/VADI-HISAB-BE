@@ -63,7 +63,8 @@ const Crop = sequelize.define(
     },
     user_id: { type: Sequelize.UUID, allowNull: false, references: { model: "users", key: "id" } },
     season: { type: Sequelize.STRING(20), allowNull: false },
-    year: { type: Sequelize.INTEGER, allowNull: false },
+    /** Financial year June–June e.g. "2025-26" (June 2025 to May 2026) */
+    year: { type: Sequelize.STRING(10), allowNull: false },
     crop_name: { type: Sequelize.STRING(50), allowNull: false },
     crop_emoji: { type: Sequelize.STRING(10), defaultValue: "🌱" },
     sub_type: { type: Sequelize.STRING(100), defaultValue: "" },
@@ -288,12 +289,7 @@ function mapCrop(row) {
   o.batchLabel = o.batchLabel ?? row.batch_label;
   o.sowingDate = o.sowingDate ?? row.sowing_date;
   o.harvestDate = o.harvestDate ?? row.harvest_date;
-  o.expectedYieldKg = o.expectedYieldKg ?? row.expected_yield_kg;
-  o.actualYieldKg = o.actualYieldKg ?? row.actual_yield_kg;
   o.userId = o.userId ?? row.user_id;
-  const ay = o.actualYieldKg != null ? parseFloat(o.actualYieldKg) : null;
-  const ey = o.expectedYieldKg != null ? parseFloat(o.expectedYieldKg) : null;
-  o.yieldEfficiency = ey && ay && ey > 0 ? +((ay / ey) * 100).toFixed(1) : null;
   return o;
 }
 

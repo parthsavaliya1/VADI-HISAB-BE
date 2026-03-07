@@ -3,6 +3,7 @@ const router = express.Router();
 const { Income, User, FarmerProfile, Crop, mapIncome, sequelize } = require("../models");
 const auth = require("../middleware/authMiddleware");
 const { Op } = require("sequelize");
+const { parseFinancialYear, getFinancialYearFromDate } = require("../utils/financialYear");
 
 function bodyToIncome(body, userId) {
   const row = {
@@ -30,9 +31,17 @@ router.post("/", auth, async (req, res) => {
 
 router.get("/", auth, async (req, res) => {
   try {
-    const { year, category, cropId, page = 1, limit = 20 } = req.query;
+    const { year, financialYear, category, cropId, page = 1, limit = 20 } = req.query;
     const where = { user_id: req.user.id };
-    if (year) where.year = Number(year);
+    const fy = financialYear || (year && String(year).includes("-") ? year : null);
+    if (fy) {
+      const range = parseFinancialYear(fy);
+      if (range) {
+        where.date = { [Op.gte]: range.startDate, [Op.lte]: range.endDate };
+      }
+    } else if (year) {
+      where.year = Number(year);
+    }
     if (category) where.category = category;
     if (cropId) where.crop_id = cropId;
 
@@ -54,9 +63,15 @@ router.get("/", auth, async (req, res) => {
 
 router.get("/summary", auth, async (req, res) => {
   try {
-    const { year } = req.query;
+    const { year, financialYear } = req.query;
     const where = { user_id: req.user.id };
-    if (year) where.year = Number(year);
+    const fy = financialYear || (year && String(year).includes("-") ? year : null);
+    if (fy) {
+      const range = parseFinancialYear(fy);
+      if (range) where.date = { [Op.gte]: range.startDate, [Op.lte]: range.endDate };
+    } else if (year) {
+      where.year = Number(year);
+    }
 
     const rows = await Income.findAll({
       attributes: ["category", [sequelize.fn("SUM", sequelize.col("amount")), "totalAmount"], [sequelize.fn("COUNT", sequelize.col("id")), "count"]],
@@ -67,7 +82,7 @@ router.get("/summary", auth, async (req, res) => {
     const summary = rows.map((r) => ({ _id: r.category, totalAmount: parseFloat(r.totalAmount) || 0, count: parseInt(r.count, 10) }));
     summary.sort((a, b) => b.totalAmount - a.totalAmount);
     const grandTotal = summary.reduce((acc, s) => acc + (s.totalAmount || 0), 0);
-    res.json({ success: true, year: year || "all", summary, grandTotal });
+    res.json({ success: true, year: fy || year || "all", financialYear: fy || null, summary, grandTotal });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -82,12 +97,14 @@ router.get("/analytics", auth, async (req, res) => {
         message: "Analytics not available. Please enable analytics consent in settings.",
       });
     }
-    const { year, district } = req.query;
-    const currentYear = Number(year) || new Date().getFullYear();
+    const { year, financialYear, district } = req.query;
+    const fy = financialYear || (year && String(year).includes("-") ? year : null);
+    const range = fy ? parseFinancialYear(fy) : null;
+    const dateWhere = range ? { date: { [Op.gte]: range.startDate, [Op.lte]: range.endDate } } : { year: Number(year) || new Date().getFullYear() };
 
     const mySum = await Income.findOne({
       attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total"]],
-      where: { user_id: req.user.id, year: currentYear },
+      where: { user_id: req.user.id, ...dateWhere },
       raw: true,
     });
     const myTotal = parseFloat(mySum?.total) || 0;
@@ -102,7 +119,7 @@ router.get("/analytics", auth, async (req, res) => {
 
     const allTotals = await Income.findAll({
       attributes: ["user_id", [sequelize.fn("SUM", sequelize.col("amount")), "total"]],
-      where: { user_id: { [Op.in]: consentedIds }, year: currentYear },
+      where: { user_id: { [Op.in]: consentedIds }, ...dateWhere },
       group: ["user_id"],
       raw: true,
     });
@@ -113,7 +130,7 @@ router.get("/analytics", auth, async (req, res) => {
 
     const topCropRows = await Income.findAll({
       attributes: ["crop_id", [sequelize.fn("SUM", sequelize.col("amount")), "total"]],
-      where: { user_id: req.user.id, year: currentYear, category: "Crop Sale" },
+      where: { user_id: req.user.id, ...dateWhere, category: "Crop Sale" },
       group: ["crop_id"],
       order: [[sequelize.literal("total"), "DESC"]],
       limit: 1,
@@ -135,7 +152,8 @@ router.get("/analytics", auth, async (req, res) => {
 
     res.json({
       success: true,
-      year: currentYear,
+      year: range ? fy : (Number(year) || new Date().getFullYear()),
+      financialYear: fy || null,
       myTotal,
       avgTotal,
       percentileRank,

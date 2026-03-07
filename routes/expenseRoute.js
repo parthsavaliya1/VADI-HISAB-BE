@@ -3,6 +3,7 @@ const router = express.Router();
 const { Expense, mapExpense, sequelize } = require("../models");
 const auth = require("../middleware/authMiddleware");
 const { Op } = require("sequelize");
+const { parseFinancialYear, getFinancialYearFromDate } = require("../utils/financialYear");
 
 const asyncHandler = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
@@ -47,11 +48,19 @@ router.get(
   "/",
   auth,
   asyncHandler(async (req, res) => {
-    const { cropId, category, year, page = 1, limit = 20 } = req.query;
+    const { cropId, category, year, financialYear, page = 1, limit = 20 } = req.query;
     const where = { user_id: req.user.id };
     if (cropId) where.crop_id = cropId;
     if (category) where.category = category;
-    if (year) where.year = Number(year);
+    const fy = financialYear || (year && String(year).includes("-") ? year : null);
+    if (fy) {
+      const range = parseFinancialYear(fy);
+      if (range) {
+        where.date = { [Op.gte]: range.startDate, [Op.lte]: range.endDate };
+      }
+    } else if (year) {
+      where.year = Number(year);
+    }
 
     const { count, rows } = await Expense.findAndCountAll({
       where,
@@ -71,9 +80,15 @@ router.get(
   "/summary",
   auth,
   asyncHandler(async (req, res) => {
-    const { year, cropId } = req.query;
+    const { year, financialYear, cropId } = req.query;
     const where = { user_id: req.user.id };
-    if (year) where.year = Number(year);
+    const fy = financialYear || (year && String(year).includes("-") ? year : null);
+    if (fy) {
+      const range = parseFinancialYear(fy);
+      if (range) where.date = { [Op.gte]: range.startDate, [Op.lte]: range.endDate };
+    } else if (year) {
+      where.year = Number(year);
+    }
     if (cropId) where.crop_id = cropId;
 
     const rows = await Expense.findAll({
@@ -85,7 +100,7 @@ router.get(
     const summary = rows.map((r) => ({ _id: r.category, total: parseFloat(r.total) || 0, count: parseInt(r.count, 10) }));
     summary.sort((a, b) => b.total - a.total);
     const grandTotal = summary.reduce((acc, s) => acc + (s.total || 0), 0);
-    res.json({ success: true, year: year || "all", summary, grandTotal });
+    res.json({ success: true, year: fy || year || "all", financialYear: fy || null, summary, grandTotal });
   })
 );
 
