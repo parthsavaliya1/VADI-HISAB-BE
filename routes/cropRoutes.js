@@ -39,6 +39,7 @@ router.post(
       area_unit: areaUnit ?? "Bigha",
       land_type: landType ?? null,
       bhagma_percentage: bhagmaPercentage != null ? Number(bhagmaPercentage) : null,
+      bhagma_expense_pct_of_income: bhagmaExpensePctOfIncome != null && bhagmaExpensePctOfIncome !== "" ? Number(bhagmaExpensePctOfIncome) : null,
       sowing_date: sowingDate ?? defaultSowingDate,
       harvest_date: harvestDate ?? null,
       status: status ?? "Active",
@@ -92,6 +93,12 @@ router.get(
     const expenseMap = {};
     const incomeMap = {};
 
+    // Per-crop expense by category (for bhagma: farmer's direct = Seed + Fertilizer + Pesticide only)
+    const FARMER_DIRECT_CATEGORIES = ["Seed", "Fertilizer", "Pesticide"]; // biyaran, khatar, jantunasak
+    let expenseByCropCategory = {}; // cropId -> { Seed: sum, Fertilizer: sum, ... }
+    // Per-crop income by category: 25% labour share only on વેચણ (Crop Sale), not on Subsidy
+    let incomeByCropCategory = {}; // cropId -> { "Crop Sale": sum, "Subsidy": sum, ... }
+
     if (cropIds.length > 0) {
       const expenseRows = await Expense.findAll({
         attributes: ["crop_id", [sequelize.fn("SUM", sequelize.col("amount")), "totalExpense"]],
@@ -99,16 +106,38 @@ router.get(
         group: ["crop_id"],
         raw: true,
       });
+      const expenseByCategoryRows = await Expense.findAll({
+        attributes: ["crop_id", "category", [sequelize.fn("SUM", sequelize.col("amount")), "total"]],
+        where: cropLinkedWhere,
+        group: ["crop_id", "category"],
+        raw: true,
+      });
+      expenseByCategoryRows.forEach((r) => {
+        const cid = r.crop_id;
+        if (!expenseByCropCategory[cid]) expenseByCropCategory[cid] = {};
+        expenseByCropCategory[cid][r.category] = parseFloat(r.total) || 0;
+      });
+      expenseRows.forEach((r) => {
+        const val = parseFloat(r.totalExpense) || 0;
+        expenseMap[r.crop_id] = val;
+        cropExpenseTotal += val;
+      });
       const incomeRows = await Income.findAll({
         attributes: ["crop_id", [sequelize.fn("SUM", sequelize.col("amount")), "totalIncome"]],
         where: cropLinkedWhere,
         group: ["crop_id"],
         raw: true,
       });
-      expenseRows.forEach((r) => {
-        const val = parseFloat(r.totalExpense) || 0;
-        expenseMap[r.crop_id] = val;
-        cropExpenseTotal += val;
+      const incomeByCategoryRows = await Income.findAll({
+        attributes: ["crop_id", "category", [sequelize.fn("SUM", sequelize.col("amount")), "total"]],
+        where: cropLinkedWhere,
+        group: ["crop_id", "category"],
+        raw: true,
+      });
+      incomeByCategoryRows.forEach((r) => {
+        const cid = r.crop_id;
+        if (!incomeByCropCategory[cid]) incomeByCropCategory[cid] = {};
+        incomeByCropCategory[cid][r.category] = parseFloat(r.total) || 0;
       });
       incomeRows.forEach((r) => {
         const val = parseFloat(r.totalIncome) || 0;
@@ -133,18 +162,46 @@ router.get(
     const extraIncomeTotal = parseFloat(extraIncomeRow?.total) || 0;
     const extraExpenseTotal = parseFloat(extraExpenseRow?.total) || 0;
 
-    const totalIncome = cropIncomeTotal + extraIncomeTotal;
-    const totalExpense = cropExpenseTotal + extraExpenseTotal;
     const totalArea = crops.reduce((sum, c) => sum + (parseFloat(c.area) || 0), 0);
 
+    // Per-crop: for bhagma, expense = 25% of profit + biyaran + khatar + jantunasak (Seed+Fertilizer+Pesticide)
     const cropReports = crops.map((crop) => {
       const id = crop.id;
       const income = incomeMap[id] ?? 0;
-      const expense = expenseMap[id] ?? 0;
-      const profit = income - expense;
+      const isBhagma = crop.land_type === "bhagma" && crop.bhagma_percentage != null;
+      const pct = isBhagma ? Number(crop.bhagma_percentage) : 0;
+      const byCat = expenseByCropCategory[id] || {};
+      let expense;
+      let profit;
+      let labourShare = null;
+      let farmerDirectExpense = null;
+
+      if (isBhagma && pct > 0) {
+        // Farmer's direct expense = બિયારણ + ખતર + જંતુનાશક (Seed, Fertilizer, Pesticide)
+        farmerDirectExpense = FARMER_DIRECT_CATEGORIES.reduce((s, cat) => s + (byCat[cat] || 0), 0);
+        // Labour share only on વેચણ (Crop Sale), not on સબસિડી (Subsidy) or other income
+        const incomeByCat = incomeByCropCategory[id] || {};
+        const cropSaleIncome = incomeByCat["Crop Sale"] || 0;
+        labourShare = (pct / 100) * cropSaleIncome;
+        // Final expense = biyaran + khatar + jantunasak + labour share (25% of vechan only)
+        expense = farmerDirectExpense + labourShare;
+        profit = income - expense; // farmer's net (total income minus expense)
+      } else {
+        expense = expenseMap[id] ?? 0;
+        profit = income - expense;
+      }
+
       const row = mapCrop(crop);
-      return { ...row, income, expense, profit };
+      const out = { ...row, income, expense, profit };
+      if (labourShare != null) out.labourShare = Math.round(labourShare * 100) / 100;
+      if (farmerDirectExpense != null) out.farmerDirectExpense = Math.round(farmerDirectExpense * 100) / 100;
+      return out;
     });
+
+    // Recompute crop totals from per-crop (bhagma crops use new expense)
+    cropExpenseTotal = cropReports.reduce((s, c) => s + c.expense, 0);
+    const totalIncome = cropIncomeTotal + extraIncomeTotal;
+    const totalExpense = cropExpenseTotal + extraExpenseTotal;
 
     const seasonBreakdown = {};
     cropReports.forEach((c) => {
@@ -347,13 +404,14 @@ router.put(
   asyncHandler(async (req, res) => {
     const allowed = [
       "season", "cropName", "cropEmoji", "subType", "batchLabel", "farmName", "year",
-      "area", "areaUnit", "landType", "bhagmaPercentage", "sowingDate", "harvestDate", "status", "notes",
+      "area", "areaUnit", "landType", "bhagmaPercentage", "bhagmaExpensePctOfIncome", "sowingDate", "harvestDate", "status", "notes",
     ];
     const updates = {};
     const map = {
       cropName: "crop_name", cropEmoji: "crop_emoji", subType: "sub_type",
       batchLabel: "batch_label", farmName: "farm_name", areaUnit: "area_unit",
       landType: "land_type", bhagmaPercentage: "bhagma_percentage",
+      bhagmaExpensePctOfIncome: "bhagma_expense_pct_of_income",
       sowingDate: "sowing_date", harvestDate: "harvest_date",
     };
     allowed.forEach((key) => {
