@@ -344,6 +344,24 @@ ServiceLedger.beforeUpdate((ledger) => {
     ledger.total_amount = +(parseFloat(ledger.area_bigha) * parseFloat(ledger.rate_per_bigha)).toFixed(2);
 });
 
+// ─── Location (Gujarat districts/talukas/villages — reference data) ─────────
+const Location = sequelize.define(
+  "Location",
+  {
+    id: {
+      type: Sequelize.UUID,
+      defaultValue: Sequelize.UUIDV4,
+      primaryKey: true,
+    },
+    type: { type: Sequelize.STRING(20), allowNull: false }, // 'district' | 'taluka' | 'village'
+    value: { type: Sequelize.STRING(100), allowNull: false },
+    label: { type: Sequelize.STRING(100), allowNull: false },
+    district_value: { type: Sequelize.STRING(100), allowNull: true },
+    taluka_value: { type: Sequelize.STRING(100), allowNull: true },
+  },
+  { tableName: "locations", timestamps: false }
+);
+
 module.exports = {
   sequelize,
   Sequelize,
@@ -353,6 +371,7 @@ module.exports = {
   Income,
   Expense,
   ServiceLedger,
+  Location,
   toApiShape,
   mapRow,
   mapCrop,
