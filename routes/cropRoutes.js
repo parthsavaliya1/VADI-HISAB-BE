@@ -147,6 +147,7 @@ router.get(
     }
 
     // Extra income (no crop) and extra expense (no crop) for this FY
+    // Exclude Bhagya Upad (ભાગ્યા નો ઉપાડ): crop_id null + Labour — already in crop labour share
     const [extraIncomeRow, extraExpenseRow] = await Promise.all([
       Income.findOne({
         attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total"]],
@@ -155,7 +156,7 @@ router.get(
       }),
       Expense.findOne({
         attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total"]],
-        where: { ...baseWhere, crop_id: null },
+        where: { ...baseWhere, crop_id: null, category: { [Op.ne]: "Labour" } },
         raw: true,
       }),
     ]);

@@ -126,6 +126,39 @@ router.get(
   })
 );
 
+/**
+ * Compute expense by category with rules:
+ * - Exclude Bhagya Upad (ભાગ્યા નો ઉપાડ): crop_id null + Labour — already in crop expense
+ * - Bhagma crop Labour/Machinery: split 50-50 between Labour and Machinery (shared cost display)
+ */
+function computeByCategory(expenseRows, cropMap, categories) {
+  const byCategory = {};
+  categories.forEach((cat) => { byCategory[cat] = 0; });
+
+  for (const row of expenseRows) {
+    const amt = parseFloat(row.amount) || 0;
+    if (amt <= 0) continue;
+
+    const cropId = row.crop_id;
+    const category = row.category;
+
+    // Exclude Bhagya Upad: general Labour expense (no crop) — not crop expense
+    if (!cropId && category === "Labour") continue;
+
+    const crop = cropMap[cropId] || null;
+    const isBhagma = crop && crop.land_type === "bhagma" && crop.bhagma_percentage != null;
+
+    if (isBhagma && (category === "Labour" || category === "Machinery")) {
+      const half = amt / 2;
+      byCategory.Labour += half;
+      byCategory.Machinery += half;
+    } else if (categories.includes(category)) {
+      byCategory[category] += amt;
+    }
+  }
+  return byCategory;
+}
+
 /** GET /expenses/analytics — per-bigha comparison (my vs avg) for exact idea; also total for reference */
 router.get(
   "/analytics",
@@ -140,15 +173,25 @@ router.get(
     const dateWhere = { date: { [Op.gte]: range.startDate, [Op.lte]: range.endDate } };
     const categories = ["Seed", "Fertilizer", "Pesticide", "Labour", "Machinery", "Irrigation", "Other"];
 
-    const myRows = await Expense.findAll({
-      attributes: ["category", [sequelize.fn("SUM", sequelize.col("amount")), "total"]],
+    // Fetch expenses with crop_id; include Crop for bhagma check
+    const myExpenses = await Expense.findAll({
+      attributes: ["crop_id", "category", "amount"],
       where: { user_id: req.user.id, ...dateWhere },
-      group: ["category"],
       raw: true,
     });
-    const mySummary = myRows.map((r) => ({ _id: r.category, total: parseFloat(r.total) || 0 }));
-    const myByCategory = {};
-    mySummary.forEach((s) => { myByCategory[s._id] = s.total; });
+    const myCropIds = [...new Set(myExpenses.map((e) => e.crop_id).filter(Boolean))];
+    const myCropRows = myCropIds.length > 0
+      ? await Crop.findAll({
+          where: { id: { [Op.in]: myCropIds } },
+          attributes: ["id", "land_type", "bhagma_percentage"],
+          raw: true,
+        })
+      : [];
+    const myCropMap = Object.fromEntries(myCropRows.map((c) => [c.id, c]));
+    const myByCategory = computeByCategory(myExpenses, myCropMap, categories);
+    const mySummary = categories
+      .filter((cat) => (myByCategory[cat] || 0) > 0)
+      .map((cat) => ({ _id: cat, total: Math.round(myByCategory[cat] * 100) / 100 }));
 
     const myCrops = await Crop.findAll({
       attributes: [[sequelize.fn("SUM", sequelize.col("area")), "totalArea"]],
@@ -172,11 +215,10 @@ router.get(
       const consented = await FarmerProfile.findAll({ where: { data_sharing: true }, attributes: ["user_id"] });
       const consentedIds = consented.map((p) => p.user_id).filter((id) => id !== req.user.id);
       if (consentedIds.length > 0) {
-        const [allRows, cropAreas] = await Promise.all([
+        const [allExpenses, cropAreas] = await Promise.all([
           Expense.findAll({
-            attributes: ["user_id", "category", [sequelize.fn("SUM", sequelize.col("amount")), "total"]],
+            attributes: ["user_id", "crop_id", "category", "amount"],
             where: { user_id: { [Op.in]: consentedIds }, ...dateWhere },
-            group: ["user_id", "category"],
             raw: true,
           }),
           Crop.findAll({
@@ -186,23 +228,37 @@ router.get(
             raw: true,
           }),
         ]);
+        const cropIdsFromExpenses = [...new Set(allExpenses.map((e) => e.crop_id).filter(Boolean))];
+        const allCrops = cropIdsFromExpenses.length > 0
+          ? await Crop.findAll({
+              where: { id: { [Op.in]: cropIdsFromExpenses } },
+              attributes: ["id", "land_type", "bhagma_percentage"],
+              raw: true,
+            })
+          : [];
+        const cropMap = Object.fromEntries(allCrops.map((c) => [c.id, c]));
         const byUser = {};
-        allRows.forEach((r) => {
-          const uid = r.user_id;
-          if (!byUser[uid]) byUser[uid] = { expense: {} };
-          byUser[uid].expense[r.category] = parseFloat(r.total) || 0;
+        const expensesByUser = {};
+        allExpenses.forEach((e) => {
+          const uid = e.user_id;
+          if (!expensesByUser[uid]) expensesByUser[uid] = [];
+          expensesByUser[uid].push(e);
         });
         cropAreas.forEach((r) => {
           const uid = r.user_id;
-          if (!byUser[uid]) byUser[uid] = { expense: {} };
+          if (!byUser[uid]) byUser[uid] = { expense: {}, area: 0 };
           byUser[uid].area = parseFloat(r.totalArea) || 0;
+        });
+        Object.entries(expensesByUser).forEach(([uid, rows]) => {
+          if (!byUser[uid]) byUser[uid] = { expense: {}, area: 0 };
+          byUser[uid].expense = computeByCategory(rows, cropMap, categories);
         });
         const usersWithArea = Object.entries(byUser).filter(([, v]) => v.area > 0);
         sampleSize = usersWithArea.length;
         categories.forEach((cat) => {
-          const totals = Object.values(byUser).map((u) => u.expense[cat] || 0);
+          const totals = usersWithArea.map(([, u]) => u.expense[cat] || 0);
           avgByCategory[cat] = totals.length ? totals.reduce((a, b) => a + b, 0) / totals.length : 0;
-          const perBighaValues = usersWithArea.map(([uid, u]) => (u.expense[cat] || 0) / u.area);
+          const perBighaValues = usersWithArea.map(([, u]) => (u.expense[cat] || 0) / u.area);
           avgPerBighaByCategory[cat] = perBighaValues.length
             ? Math.round((perBighaValues.reduce((a, b) => a + b, 0) / perBighaValues.length) * 100) / 100
             : 0;
