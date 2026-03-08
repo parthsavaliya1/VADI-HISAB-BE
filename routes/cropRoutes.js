@@ -14,7 +14,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const {
       season, cropName, cropEmoji, subType, batchLabel, farmName, year,
-      area, areaUnit, sowingDate, harvestDate, status, notes,
+      area, areaUnit, landType, bhagmaPercentage, sowingDate, harvestDate, status, notes,
     } = req.body;
 
     if (!season || !cropName || !area) {
@@ -37,6 +37,8 @@ router.post(
       year: financialYear,
       area: Number(area),
       area_unit: areaUnit ?? "Bigha",
+      land_type: landType ?? null,
+      bhagma_percentage: bhagmaPercentage != null ? Number(bhagmaPercentage) : null,
       sowing_date: sowingDate ?? defaultSowingDate,
       harvest_date: harvestDate ?? null,
       status: status ?? "Active",
@@ -345,12 +347,13 @@ router.put(
   asyncHandler(async (req, res) => {
     const allowed = [
       "season", "cropName", "cropEmoji", "subType", "batchLabel", "farmName", "year",
-      "area", "areaUnit", "sowingDate", "harvestDate", "status", "notes",
+      "area", "areaUnit", "landType", "bhagmaPercentage", "sowingDate", "harvestDate", "status", "notes",
     ];
     const updates = {};
     const map = {
       cropName: "crop_name", cropEmoji: "crop_emoji", subType: "sub_type",
       batchLabel: "batch_label", farmName: "farm_name", areaUnit: "area_unit",
+      landType: "land_type", bhagmaPercentage: "bhagma_percentage",
       sowingDate: "sowing_date", harvestDate: "harvest_date",
     };
     allowed.forEach((key) => {

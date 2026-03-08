@@ -75,6 +75,9 @@ const Crop = sequelize.define(
     farm_name: { type: Sequelize.STRING(80), allowNull: true, defaultValue: null },
     area: { type: Sequelize.DECIMAL(12, 2), allowNull: false },
     area_unit: { type: Sequelize.STRING(20), defaultValue: "Bigha" },
+    /** "ghare" = own land, "bhagma" = sharecropping; when bhagma, bhagma_percentage is set (25, 30, 33, 50) */
+    land_type: { type: Sequelize.STRING(20), allowNull: true, defaultValue: null },
+    bhagma_percentage: { type: Sequelize.INTEGER, allowNull: true, defaultValue: null },
     sowing_date: { type: Sequelize.DATEONLY, defaultValue: null },
     harvest_date: { type: Sequelize.DATEONLY, defaultValue: null },
     status: { type: Sequelize.STRING(20), defaultValue: "Active" },
@@ -293,6 +296,8 @@ function mapCrop(row) {
   o.subType = o.subType ?? row.sub_type;
   o.batchLabel = o.batchLabel ?? row.batch_label;
   o.farmName = o.farmName ?? row.farm_name;
+  o.landType = o.landType ?? row.land_type;
+  o.bhagmaPercentage = o.bhagmaPercentage ?? row.bhagma_percentage;
   o.sowingDate = o.sowingDate ?? row.sowing_date;
   o.harvestDate = o.harvestDate ?? row.harvest_date;
   o.userId = o.userId ?? row.user_id;
