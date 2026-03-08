@@ -109,11 +109,11 @@ router.get("/summary", auth, async (req, res) => {
 
 router.get("/analytics", auth, async (req, res) => {
   try {
-    const currentUser = await User.findByPk(req.user.id);
-    if (!currentUser || !currentUser.analytics_consent) {
+    const myProfile = await FarmerProfile.findOne({ where: { user_id: req.user.id }, attributes: ["data_sharing"] });
+    if (!myProfile || myProfile.data_sharing !== true) {
       return res.status(403).json({
         success: false,
-        message: "Analytics not available. Please enable analytics consent in settings.",
+        message: "Analytics not available. Please enable data sharing in profile.",
       });
     }
     const { year, financialYear, district } = req.query;
@@ -128,13 +128,11 @@ router.get("/analytics", auth, async (req, res) => {
     });
     const myTotal = parseFloat(mySum?.total) || 0;
 
-    const consentedUsers = await User.findAll({ where: { analytics_consent: true }, attributes: ["id"] });
-    let consentedIds = consentedUsers.map((u) => u.id);
-    if (district) {
-      const profiles = await FarmerProfile.findAll({ where: { district }, attributes: ["user_id"] });
-      const districtIds = profiles.map((p) => p.user_id);
-      consentedIds = consentedIds.filter((id) => districtIds.includes(id));
-    }
+    const consentedProfiles = await FarmerProfile.findAll({
+      where: district ? { data_sharing: true, district } : { data_sharing: true },
+      attributes: ["user_id"],
+    });
+    let consentedIds = consentedProfiles.map((p) => p.user_id);
 
     const allTotals = await Income.findAll({
       attributes: ["user_id", [sequelize.fn("SUM", sequelize.col("amount")), "total"]],

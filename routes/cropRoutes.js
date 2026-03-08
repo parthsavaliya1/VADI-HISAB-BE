@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { Crop, Expense, Income, mapCrop, sequelize } = require("../models");
+const { Crop, Expense, Income, FarmerProfile, mapCrop, sequelize } = require("../models");
 const auth = require("../middleware/authMiddleware");
 const { Op } = require("sequelize");
 const { getFinancialYearFromDate, parseFinancialYear, sortFinancialYearsDesc } = require("../utils/financialYear");
@@ -263,8 +263,10 @@ router.get(
         myTotalExpense: 0,
         myNetProfit: 0,
         myTotalArea: 0,
+        myIncomePerBigha: 0,
         avgIncome: 0,
         avgExpense: 0,
+        avgIncomePerBigha: 0,
         percentileIncome: null,
         percentileExpense: null,
         sampleSize: 0,
@@ -287,12 +289,12 @@ router.get(
     const myTotalIncome = parseFloat(myInc[0]?.total) || 0;
     const myNetProfit = myTotalIncome - myTotalExpense;
 
-    const { User } = require("../models");
-    const currentUser = await User.findByPk(req.user.id);
-    let avgIncome = 0, avgExpense = 0, percentileIncome = null, percentileExpense = null, sampleSize = 0;
-    if (currentUser?.analytics_consent) {
-      const consentedUsers = await User.findAll({ where: { analytics_consent: true }, attributes: ["id"] });
-      const consentedIds = consentedUsers.map((u) => u.id).filter((id) => id !== req.user.id);
+    const myProfile = await FarmerProfile.findOne({ where: { user_id: req.user.id }, attributes: ["data_sharing"] });
+    const myConsent = myProfile?.data_sharing === true;
+    let avgIncome = 0, avgExpense = 0, avgIncomePerBigha = 0, percentileIncome = null, percentileExpense = null, sampleSize = 0;
+    if (myConsent) {
+      const consentedProfiles = await FarmerProfile.findAll({ where: { data_sharing: true }, attributes: ["user_id"] });
+      const consentedIds = consentedProfiles.map((p) => p.user_id).filter((id) => id !== req.user.id);
       if (consentedIds.length) {
         const allCrops = await Crop.findAll({
           where: { user_id: { [Op.in]: consentedIds }, year: fy, ...(cropName ? { crop_name: cropName } : {}) },
@@ -321,15 +323,20 @@ router.get(
         ]);
         const expByCrop = {}; expRows.forEach((r) => { expByCrop[r.crop_id] = parseFloat(r.total) || 0; });
         const incByCrop = {}; incRows.forEach((r) => { incByCrop[r.crop_id] = parseFloat(r.total) || 0; });
-        const userTotals = Object.entries(byUser).map(([uid, { cropIds: cids }]) => {
+        const userTotals = Object.entries(byUser).map(([uid, { cropIds: cids, area }]) => {
           const expense = cids.reduce((s, cid) => s + (expByCrop[cid] || 0), 0);
           const income = cids.reduce((s, cid) => s + (incByCrop[cid] || 0), 0);
-          return { userId: uid, income, expense };
+          const areaNum = parseFloat(area) || 0;
+          const incomePerBigha = areaNum > 0 ? income / areaNum : 0;
+          return { userId: uid, income, expense, area: areaNum, incomePerBigha };
         });
         sampleSize = userTotals.length;
         if (sampleSize) {
           avgIncome = userTotals.reduce((a, u) => a + u.income, 0) / sampleSize;
           avgExpense = userTotals.reduce((a, u) => a + u.expense, 0) / sampleSize;
+          const withArea = userTotals.filter((u) => u.area > 0);
+          const avgIncomePerBighaNum = withArea.length ? withArea.reduce((a, u) => a + u.incomePerBigha, 0) / withArea.length : 0;
+          avgIncomePerBigha = +avgIncomePerBighaNum.toFixed(2);
           const incomeSorted = userTotals.map((u) => u.income).sort((a, b) => a - b);
           const expenseSorted = userTotals.map((u) => u.expense).sort((a, b) => a - b);
           const belowIncome = incomeSorted.filter((v) => v < myTotalIncome).length;
@@ -340,6 +347,8 @@ router.get(
       }
     }
 
+    const myIncomePerBigha = myTotalArea > 0 ? +(myTotalIncome / myTotalArea).toFixed(2) : 0;
+
     res.json({
       success: true,
       financialYear: fy,
@@ -348,8 +357,10 @@ router.get(
       myTotalExpense,
       myNetProfit,
       myTotalArea,
+      myIncomePerBigha,
       avgIncome: +avgIncome.toFixed(2),
       avgExpense: +avgExpense.toFixed(2),
+      avgIncomePerBigha: avgIncomePerBigha ?? 0,
       percentileIncome,
       percentileExpense,
       sampleSize,

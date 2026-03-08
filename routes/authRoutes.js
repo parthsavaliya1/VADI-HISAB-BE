@@ -1,20 +1,21 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const axios = require("axios");
-const { User } = require("../models");
+const { User, FarmerProfile } = require("../models");
 const auth = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
-function toUserResponse(user) {
+function toUserResponse(user, profileConsent = null) {
   const u = user.get ? user.get({ plain: true }) : user;
+  const analyticsConsent = profileConsent !== undefined ? profileConsent : u.analytics_consent;
   return {
     _id: u.id,
     id: u.id,
     phone: u.phone,
     role: u.role,
     isProfileCompleted: u.is_profile_completed,
-    analyticsConsent: u.analytics_consent,
+    analyticsConsent,
     lastActiveAt: u.last_active_at,
     createdAt: u.created_at,
     updatedAt: u.updated_at,
@@ -74,11 +75,13 @@ router.post("/verify-otp", async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
+    const profile = await FarmerProfile.findOne({ where: { user_id: user.id }, attributes: ["data_sharing"] });
+    const consentGiven = profile ? (profile.data_sharing != null) : (user.analytics_consent != null);
     return res.json({
       token,
       isNewUser,
       isProfileCompleted: user.is_profile_completed,
-      consentGiven: user.analytics_consent !== null,
+      consentGiven,
     });
   } catch (error) {
     console.error("verify-otp error:", error.message);
@@ -98,11 +101,10 @@ router.post("/consent", auth, async (req, res) => {
     return res.status(400).json({ message: "consent must be true or false" });
   }
   try {
-    const user = await User.findByPk(req.user.id);
-    if (!user) return res.status(404).json({ message: "User not found" });
-    user.analytics_consent = consent;
-    await user.save();
-    return res.json({ message: "Consent saved", analyticsConsent: user.analytics_consent });
+    const profile = await FarmerProfile.findOne({ where: { user_id: req.user.id } });
+    if (!profile) return res.status(404).json({ message: "Profile not found. Complete profile first." });
+    await profile.update({ data_sharing: consent });
+    return res.json({ message: "Consent saved", analyticsConsent: profile.data_sharing });
   } catch (error) {
     return res.status(500).json({ message: "Consent save error", error: error.message });
   }
@@ -112,7 +114,9 @@ router.get("/me", auth, async (req, res) => {
   try {
     const user = await User.findByPk(req.user.id);
     if (!user) return res.status(404).json({ message: "User not found" });
-    return res.json({ user: toUserResponse(user) });
+    const profile = await FarmerProfile.findOne({ where: { user_id: req.user.id }, attributes: ["data_sharing"] });
+    const profileConsent = profile?.data_sharing;
+    return res.json({ user: toUserResponse(user, profileConsent) });
   } catch (error) {
     return res.status(500).json({ message: "Error fetching user", error: error.message });
   }

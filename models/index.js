@@ -19,6 +19,7 @@ const User = sequelize.define(
     phone: { type: Sequelize.STRING(15), allowNull: false, unique: true },
     role: { type: Sequelize.STRING(20), defaultValue: "farmer" },
     is_profile_completed: { type: Sequelize.BOOLEAN, defaultValue: false },
+    /** @deprecated Use FarmerProfile.data_sharing; kept for backward compat / migration */
     analytics_consent: { type: Sequelize.BOOLEAN, defaultValue: null },
     last_active_at: { type: Sequelize.DATE, defaultValue: null },
   },
@@ -47,6 +48,8 @@ const FarmerProfile = sequelize.define(
     labour_types: { type: Sequelize.JSONB, allowNull: false, defaultValue: [] },
     /** Farms with name and area in bigha: [{ name: "vadi", area: 30 }, ...] */
     farms: { type: Sequelize.JSONB, allowNull: true, defaultValue: [] },
+    /** Data sharing / analytics consent: null = not set, true/false = user choice (moved from users.analytics_consent) */
+    data_sharing: { type: Sequelize.BOOLEAN, allowNull: true, defaultValue: null },
   },
   { tableName: "farmer_profiles" }
 );

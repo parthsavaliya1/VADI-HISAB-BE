@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { Expense, Crop, mapExpense, sequelize } = require("../models");
+const { Expense, Crop, FarmerProfile, mapExpense, sequelize } = require("../models");
 const auth = require("../middleware/authMiddleware");
 const { Op } = require("sequelize");
 const { parseFinancialYear, getFinancialYearFromDate } = require("../utils/financialYear");
@@ -123,6 +123,103 @@ router.get(
     summary.sort((a, b) => b.total - a.total);
     const grandTotal = summary.reduce((acc, s) => acc + (s.total || 0), 0);
     res.json({ success: true, year: fy || year || "all", financialYear: fy || null, summary, grandTotal });
+  })
+);
+
+/** GET /expenses/analytics — per-bigha comparison (my vs avg) for exact idea; also total for reference */
+router.get(
+  "/analytics",
+  auth,
+  asyncHandler(async (req, res) => {
+    const { financialYear } = req.query;
+    const fy = financialYear || getFinancialYearFromDate();
+    const range = parseFinancialYear(fy);
+    if (!range) {
+      return res.status(400).json({ success: false, message: "Invalid financialYear." });
+    }
+    const dateWhere = { date: { [Op.gte]: range.startDate, [Op.lte]: range.endDate } };
+    const categories = ["Seed", "Fertilizer", "Pesticide", "Labour", "Machinery", "Irrigation", "Other"];
+
+    const myRows = await Expense.findAll({
+      attributes: ["category", [sequelize.fn("SUM", sequelize.col("amount")), "total"]],
+      where: { user_id: req.user.id, ...dateWhere },
+      group: ["category"],
+      raw: true,
+    });
+    const mySummary = myRows.map((r) => ({ _id: r.category, total: parseFloat(r.total) || 0 }));
+    const myByCategory = {};
+    mySummary.forEach((s) => { myByCategory[s._id] = s.total; });
+
+    const myCrops = await Crop.findAll({
+      attributes: [[sequelize.fn("SUM", sequelize.col("area")), "totalArea"]],
+      where: { user_id: req.user.id, year: fy },
+      raw: true,
+    });
+    const myArea = parseFloat(myCrops[0]?.totalArea) || 0;
+    const myPerBighaByCategory = {};
+    if (myArea > 0) {
+      categories.forEach((cat) => {
+        myPerBighaByCategory[cat] = Math.round(((myByCategory[cat] || 0) / myArea) * 100) / 100;
+      });
+    }
+
+    const myProfile = await FarmerProfile.findOne({ where: { user_id: req.user.id }, attributes: ["data_sharing"] });
+    const myConsent = myProfile?.data_sharing === true;
+    let avgByCategory = {};
+    let avgPerBighaByCategory = {};
+    let sampleSize = 0;
+    if (myConsent) {
+      const consented = await FarmerProfile.findAll({ where: { data_sharing: true }, attributes: ["user_id"] });
+      const consentedIds = consented.map((p) => p.user_id).filter((id) => id !== req.user.id);
+      if (consentedIds.length > 0) {
+        const [allRows, cropAreas] = await Promise.all([
+          Expense.findAll({
+            attributes: ["user_id", "category", [sequelize.fn("SUM", sequelize.col("amount")), "total"]],
+            where: { user_id: { [Op.in]: consentedIds }, ...dateWhere },
+            group: ["user_id", "category"],
+            raw: true,
+          }),
+          Crop.findAll({
+            attributes: ["user_id", [sequelize.fn("SUM", sequelize.col("area")), "totalArea"]],
+            where: { user_id: { [Op.in]: consentedIds }, year: fy },
+            group: ["user_id"],
+            raw: true,
+          }),
+        ]);
+        const byUser = {};
+        allRows.forEach((r) => {
+          const uid = r.user_id;
+          if (!byUser[uid]) byUser[uid] = { expense: {} };
+          byUser[uid].expense[r.category] = parseFloat(r.total) || 0;
+        });
+        cropAreas.forEach((r) => {
+          const uid = r.user_id;
+          if (!byUser[uid]) byUser[uid] = { expense: {} };
+          byUser[uid].area = parseFloat(r.totalArea) || 0;
+        });
+        const usersWithArea = Object.entries(byUser).filter(([, v]) => v.area > 0);
+        sampleSize = usersWithArea.length;
+        categories.forEach((cat) => {
+          const totals = Object.values(byUser).map((u) => u.expense[cat] || 0);
+          avgByCategory[cat] = totals.length ? totals.reduce((a, b) => a + b, 0) / totals.length : 0;
+          const perBighaValues = usersWithArea.map(([uid, u]) => (u.expense[cat] || 0) / u.area);
+          avgPerBighaByCategory[cat] = perBighaValues.length
+            ? Math.round((perBighaValues.reduce((a, b) => a + b, 0) / perBighaValues.length) * 100) / 100
+            : 0;
+        });
+      }
+    }
+    res.json({
+      success: true,
+      financialYear: fy,
+      mySummary,
+      myByCategory,
+      myArea,
+      myPerBighaByCategory,
+      avgByCategory,
+      avgPerBighaByCategory,
+      sampleSize,
+    });
   })
 );
 

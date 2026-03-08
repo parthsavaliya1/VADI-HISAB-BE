@@ -33,6 +33,7 @@ function profileToBody(rec) {
     implementsAvailable: p.implements_available || [],
     labourTypes,
     farms,
+    analyticsConsent: p.data_sharing != null ? !!p.data_sharing : null,
     createdAt: p.created_at,
     updatedAt: p.updated_at,
   };
@@ -113,6 +114,9 @@ router.put("/update", auth, async (req, res) => {
     if (req.body.farms !== undefined) {
       updates.farms = Array.isArray(req.body.farms) ? req.body.farms : [];
       updates.total_land_value = totalLandFromFarms(updates.farms);
+    }
+    if (req.body.dataSharing !== undefined || req.body.analyticsConsent !== undefined) {
+      updates.data_sharing = !!(req.body.dataSharing ?? req.body.analyticsConsent);
     }
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ message: "No valid fields provided to update." });
