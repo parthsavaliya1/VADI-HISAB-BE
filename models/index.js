@@ -168,7 +168,8 @@ const Expense = sequelize.define(
       primaryKey: true,
     },
     user_id: { type: Sequelize.UUID, allowNull: false, references: { model: "users", key: "id" } },
-    crop_id: { type: Sequelize.UUID, allowNull: false, references: { model: "crops", key: "id" } },
+    /** Null for general expense (સામાન્ય ખર્ચ) not linked to any crop */
+    crop_id: { type: Sequelize.UUID, allowNull: true, references: { model: "crops", key: "id" } },
     category: { type: Sequelize.STRING(30), allowNull: false },
     amount: { type: Sequelize.DECIMAL(14, 2), defaultValue: 0 },
     year: { type: Sequelize.INTEGER },
@@ -234,8 +235,8 @@ Expense.beforeUpdate(computeExpenseAmount);
 
 User.hasMany(Expense, { foreignKey: "user_id" });
 Expense.belongsTo(User, { foreignKey: "user_id" });
-Crop.hasMany(Expense, { foreignKey: "crop_id" });
-Expense.belongsTo(Crop, { foreignKey: "crop_id" });
+Crop.hasMany(Expense, { foreignKey: "crop_id", constraints: false });
+Expense.belongsTo(Crop, { foreignKey: "crop_id", constraints: false });
 
 // ─── ServiceLedger ─────────────────────────────────────────────────────────────
 const ServiceLedger = sequelize.define(

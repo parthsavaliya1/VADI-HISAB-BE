@@ -11,7 +11,7 @@ const asyncHandler = (fn) => (req, res, next) =>
 function bodyToExpense(body, userId) {
   const row = {
     user_id: userId,
-    crop_id: body.cropId,
+    crop_id: body.cropId ?? null,
     category: body.category,
     date: body.date ?? new Date(),
     notes: body.notes ?? "",
@@ -32,9 +32,10 @@ router.post(
   auth,
   asyncHandler(async (req, res) => {
     const { cropId, category, date, notes, seed, fertilizer, pesticide, labourDaily, labourContract, machinery, irrigation, other } = req.body;
-    if (!cropId || !category) {
-      return res.status(400).json({ success: false, message: "cropId and category are required." });
+    if (!category) {
+      return res.status(400).json({ success: false, message: "category is required." });
     }
+    // cropId optional: null/omit for general expense (સામાન્ય ખર્ચ)
     const VALID_CATEGORIES = ["Seed", "Fertilizer", "Pesticide", "Labour", "Machinery", "Irrigation", "Other"];
     if (!VALID_CATEGORIES.includes(category)) {
       return res.status(400).json({ success: false, message: `category must be one of: ${VALID_CATEGORIES.join(", ")}` });
