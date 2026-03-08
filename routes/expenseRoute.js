@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { Expense, mapExpense, sequelize } = require("../models");
+const { Expense, Crop, mapExpense, sequelize } = require("../models");
 const auth = require("../middleware/authMiddleware");
 const { Op } = require("sequelize");
 const { parseFinancialYear, getFinancialYearFromDate } = require("../utils/financialYear");
@@ -56,8 +56,21 @@ router.get(
     const fy = financialYear || (year && String(year).includes("-") ? year : null);
     if (fy) {
       const range = parseFinancialYear(fy);
+      const cropIdsForYear = await Crop.findAll({
+        where: { user_id: req.user.id, year: fy },
+        attributes: ["id"],
+        raw: true,
+      }).then((rows) => rows.map((r) => r.id));
       if (range) {
-        where.date = { [Op.gte]: range.startDate, [Op.lte]: range.endDate };
+        if (cropIdsForYear.length > 0) {
+          // Include expenses that are either: (1) date in FY range, or (2) linked to a crop of this year
+          where[Op.or] = [
+            { date: { [Op.gte]: range.startDate, [Op.lte]: range.endDate } },
+            { crop_id: { [Op.in]: cropIdsForYear } },
+          ];
+        } else {
+          where.date = { [Op.gte]: range.startDate, [Op.lte]: range.endDate };
+        }
       }
     } else if (year) {
       where.year = Number(year);
@@ -65,13 +78,21 @@ router.get(
 
     const { count, rows } = await Expense.findAndCountAll({
       where,
+      include: [{ model: Crop, as: "Crop", attributes: ["id", "crop_name"], required: false }],
       order: [["date", "DESC"]],
       offset: (Number(page) - 1) * Number(limit),
       limit: Number(limit),
     });
+    const data = rows.map((row) => {
+      const mapped = mapExpense(row);
+      if (row.Crop && mapped.cropId) {
+        mapped.cropId = { _id: row.Crop.id, cropName: row.Crop.crop_name };
+      }
+      return mapped;
+    });
     res.json({
       success: true,
-      data: rows.map(mapExpense),
+      data,
       pagination: { total: count, page: Number(page), limit: Number(limit), totalPages: Math.ceil(count / Number(limit)) },
     });
   })

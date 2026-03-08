@@ -5,6 +5,9 @@ const auth = require("../middleware/authMiddleware");
 const { Op } = require("sequelize");
 const { parseFinancialYear, getFinancialYearFromDate } = require("../utils/financialYear");
 
+const asyncHandler = (fn) => (req, res, next) =>
+  Promise.resolve(fn(req, res, next)).catch(next);
+
 function bodyToIncome(body, userId) {
   const row = {
     user_id: userId,
@@ -29,37 +32,53 @@ router.post("/", auth, async (req, res) => {
   }
 });
 
-router.get("/", auth, async (req, res) => {
-  try {
-    const { year, financialYear, category, cropId, page = 1, limit = 20 } = req.query;
-    const where = { user_id: req.user.id };
-    const fy = financialYear || (year && String(year).includes("-") ? year : null);
-    if (fy) {
-      const range = parseFinancialYear(fy);
-      if (range) {
+router.get("/", auth, asyncHandler(async (req, res) => {
+  const { year, financialYear, category, cropId, page = 1, limit = 20 } = req.query;
+  const where = { user_id: req.user.id };
+  const fy = financialYear || (year && String(year).includes("-") ? year : null);
+  if (fy) {
+    const range = parseFinancialYear(fy);
+    const cropIdsForYear = await Crop.findAll({
+      where: { user_id: req.user.id, year: fy },
+      attributes: ["id"],
+      raw: true,
+    }).then((rows) => rows.map((r) => r.id));
+    if (range) {
+      if (cropIdsForYear.length > 0) {
+        where[Op.or] = [
+          { date: { [Op.gte]: range.startDate, [Op.lte]: range.endDate } },
+          { crop_id: { [Op.in]: cropIdsForYear } },
+        ];
+      } else {
         where.date = { [Op.gte]: range.startDate, [Op.lte]: range.endDate };
       }
-    } else if (year) {
-      where.year = Number(year);
     }
-    if (category) where.category = category;
-    if (cropId) where.crop_id = cropId;
-
-    const { count, rows } = await Income.findAndCountAll({
-      where,
-      order: [["date", "DESC"]],
-      offset: (Number(page) - 1) * Number(limit),
-      limit: Number(limit),
-    });
-    res.json({
-      success: true,
-      data: rows.map(mapIncome),
-      pagination: { total: count, page: Number(page), limit: Number(limit) },
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+  } else if (year) {
+    where.year = Number(year);
   }
-});
+  if (category) where.category = category;
+  if (cropId) where.crop_id = cropId;
+
+  const { count, rows } = await Income.findAndCountAll({
+    where,
+    include: [{ model: Crop, as: "Crop", attributes: ["id", "crop_name"], required: false }],
+    order: [["date", "DESC"]],
+    offset: (Number(page) - 1) * Number(limit),
+    limit: Number(limit),
+  });
+  const data = rows.map((row) => {
+    const mapped = mapIncome(row);
+    if (row.Crop && mapped.cropId) {
+      mapped.cropId = { _id: row.Crop.id, cropName: row.Crop.crop_name };
+    }
+    return mapped;
+  });
+  res.json({
+    success: true,
+    data,
+    pagination: { total: count, page: Number(page), limit: Number(limit) },
+  });
+}));
 
 router.get("/summary", auth, async (req, res) => {
   try {

@@ -81,7 +81,9 @@ router.get(
 
     const cropIds = crops.length ? crops.map((c) => c.id) : [];
 
-    // Crop-linked income/expense for this FY only (filter by date)
+    // Crop-linked income/expense: include all transactions for this year's crops (by crop year, not transaction date)
+    // so that when user selects 2026-27, expenses added for 2026-27 crops show and totals are correct
+    const cropLinkedWhere = { user_id: userId, crop_id: { [Op.in]: cropIds } };
     const baseWhere = { user_id: userId, ...dateWhere };
     let cropIncomeTotal = 0;
     let cropExpenseTotal = 0;
@@ -91,13 +93,13 @@ router.get(
     if (cropIds.length > 0) {
       const expenseRows = await Expense.findAll({
         attributes: ["crop_id", [sequelize.fn("SUM", sequelize.col("amount")), "totalExpense"]],
-        where: { ...baseWhere, crop_id: { [Op.in]: cropIds } },
+        where: cropLinkedWhere,
         group: ["crop_id"],
         raw: true,
       });
       const incomeRows = await Income.findAll({
         attributes: ["crop_id", [sequelize.fn("SUM", sequelize.col("amount")), "totalIncome"]],
-        where: { ...baseWhere, crop_id: { [Op.in]: cropIds } },
+        where: cropLinkedWhere,
         group: ["crop_id"],
         raw: true,
       });
