@@ -71,50 +71,73 @@ router.get(
       ? financialYear
       : (Number(financialYear) ? `${financialYear}-${String((Number(financialYear) + 1) % 100).padStart(2, "0")}` : getFinancialYearFromDate());
 
+    const range = parseFinancialYear(year);
+    const dateWhere = range ? { date: { [Op.gte]: range.startDate, [Op.lte]: range.endDate } } : {};
+
     const crops = await Crop.findAll({
       where: { user_id: userId, year },
       order: [["created_at", "DESC"]],
     });
 
-    if (!crops.length) {
-      return res.json({
-        success: true,
-        year,
-        financialYear: year,
-        crops: [],
-        summary: { totalIncome: 0, totalExpense: 0, netProfit: 0, totalCrops: 0, totalArea: 0 },
+    const cropIds = crops.length ? crops.map((c) => c.id) : [];
+
+    // Crop-linked income/expense for this FY only (filter by date)
+    const baseWhere = { user_id: userId, ...dateWhere };
+    let cropIncomeTotal = 0;
+    let cropExpenseTotal = 0;
+    const expenseMap = {};
+    const incomeMap = {};
+
+    if (cropIds.length > 0) {
+      const expenseRows = await Expense.findAll({
+        attributes: ["crop_id", [sequelize.fn("SUM", sequelize.col("amount")), "totalExpense"]],
+        where: { ...baseWhere, crop_id: { [Op.in]: cropIds } },
+        group: ["crop_id"],
+        raw: true,
+      });
+      const incomeRows = await Income.findAll({
+        attributes: ["crop_id", [sequelize.fn("SUM", sequelize.col("amount")), "totalIncome"]],
+        where: { ...baseWhere, crop_id: { [Op.in]: cropIds } },
+        group: ["crop_id"],
+        raw: true,
+      });
+      expenseRows.forEach((r) => {
+        const val = parseFloat(r.totalExpense) || 0;
+        expenseMap[r.crop_id] = val;
+        cropExpenseTotal += val;
+      });
+      incomeRows.forEach((r) => {
+        const val = parseFloat(r.totalIncome) || 0;
+        incomeMap[r.crop_id] = val;
+        cropIncomeTotal += val;
       });
     }
 
-    const cropIds = crops.map((c) => c.id);
+    // Extra income (no crop) and extra expense (no crop) for this FY
+    const [extraIncomeRow, extraExpenseRow] = await Promise.all([
+      Income.findOne({
+        attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total"]],
+        where: { ...baseWhere, crop_id: null },
+        raw: true,
+      }),
+      Expense.findOne({
+        attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total"]],
+        where: { ...baseWhere, crop_id: null },
+        raw: true,
+      }),
+    ]);
+    const extraIncomeTotal = parseFloat(extraIncomeRow?.total) || 0;
+    const extraExpenseTotal = parseFloat(extraExpenseRow?.total) || 0;
 
-    const expenseRows = await Expense.findAll({
-      attributes: ["crop_id", [sequelize.fn("SUM", sequelize.col("amount")), "totalExpense"]],
-      where: { crop_id: { [Op.in]: cropIds } },
-      group: ["crop_id"],
-      raw: true,
-    });
-    const incomeRows = await Income.findAll({
-      attributes: ["crop_id", [sequelize.fn("SUM", sequelize.col("amount")), "totalIncome"]],
-      where: { crop_id: { [Op.in]: cropIds } },
-      group: ["crop_id"],
-      raw: true,
-    });
+    const totalIncome = cropIncomeTotal + extraIncomeTotal;
+    const totalExpense = cropExpenseTotal + extraExpenseTotal;
+    const totalArea = crops.reduce((sum, c) => sum + (parseFloat(c.area) || 0), 0);
 
-    const expenseMap = {};
-    expenseRows.forEach((r) => { expenseMap[r.crop_id] = parseFloat(r.totalExpense) || 0; });
-    const incomeMap = {};
-    incomeRows.forEach((r) => { incomeMap[r.crop_id] = parseFloat(r.totalIncome) || 0; });
-
-    let totalIncome = 0, totalExpense = 0, totalArea = 0;
     const cropReports = crops.map((crop) => {
       const id = crop.id;
       const income = incomeMap[id] ?? 0;
       const expense = expenseMap[id] ?? 0;
       const profit = income - expense;
-      totalIncome += income;
-      totalExpense += expense;
-      totalArea += parseFloat(crop.area) ?? 0;
       const row = mapCrop(crop);
       return { ...row, income, expense, profit };
     });
@@ -142,6 +165,10 @@ router.get(
         netProfit: totalIncome - totalExpense,
         totalCrops: crops.length,
         totalArea,
+        cropIncome: cropIncomeTotal,
+        cropExpense: cropExpenseTotal,
+        extraIncome: extraIncomeTotal,
+        extraExpense: extraExpenseTotal,
       },
     });
   })
