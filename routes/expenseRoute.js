@@ -136,6 +136,18 @@ router.get(
   })
 );
 
+router.put(
+  "/:id",
+  auth,
+  asyncHandler(async (req, res) => {
+    const expense = await Expense.findOne({ where: { id: req.params.id, user_id: req.user.id } });
+    if (!expense) return res.status(404).json({ success: false, message: "Expense not found." });
+    const updates = bodyToExpense(req.body, req.user.id);
+    await expense.update(updates);
+    res.json({ success: true, data: mapExpense(expense) });
+  })
+);
+
 router.delete(
   "/:id",
   auth,

@@ -14,7 +14,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const {
       season, cropName, cropEmoji, subType, batchLabel, farmName, year,
-      area, areaUnit, landType, bhagmaPercentage, sowingDate, harvestDate, status, notes,
+      area, areaUnit, landType, bhagmaPercentage, bhagmaExpensePctOfIncome, sowingDate, harvestDate, status, notes,
     } = req.body;
 
     if (!season || !cropName || !area) {
