@@ -13,6 +13,7 @@ function bodyToExpense(body, userId) {
     user_id: userId,
     crop_id: body.cropId ?? null,
     category: body.category,
+    expense_source: body.expenseSource ?? null,
     date: body.date ?? new Date(),
     notes: body.notes ?? "",
     seed: body.seed ?? null,

@@ -177,6 +177,7 @@ const Expense = sequelize.define(
     /** Null for general expense (સામાન્ય ખર્ચ) not linked to any crop */
     crop_id: { type: Sequelize.UUID, allowNull: true, references: { model: "crops", key: "id" } },
     category: { type: Sequelize.STRING(30), allowNull: false },
+    expense_source: { type: Sequelize.STRING(30), allowNull: true, defaultValue: null },
     amount: { type: Sequelize.DECIMAL(14, 2), defaultValue: 0 },
     year: { type: Sequelize.INTEGER },
     date: { type: Sequelize.DATEONLY, defaultValue: Sequelize.NOW },
@@ -357,6 +358,7 @@ function mapExpense(row) {
   o.other = o.other ?? row.other;
   o.userId = o.userId ?? row.user_id;
   o.cropId = o.cropId ?? row.crop_id;
+  o.expenseSource = o.expenseSource ?? row.expense_source;
   return o;
 }
 

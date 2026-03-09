@@ -148,10 +148,15 @@ router.get(
 
     // Extra income (no crop) and extra expense (no crop) for this FY
     // Exclude Bhagya Upad (ભાગ્યા નો ઉપાડ): crop_id null + Labour — already in crop labour share
-    const [extraIncomeRow, extraExpenseRow] = await Promise.all([
+    const [extraIncomeRow, tractorIncomeRow, extraExpenseRow, bhagyaUpadRow] = await Promise.all([
       Income.findOne({
         attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total"]],
         where: { ...baseWhere, crop_id: null },
+        raw: true,
+      }),
+      Income.findOne({
+        attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total"]],
+        where: { ...baseWhere, crop_id: null, category: "Rental Income" },
         raw: true,
       }),
       Expense.findOne({
@@ -159,9 +164,24 @@ router.get(
         where: { ...baseWhere, crop_id: null, category: { [Op.ne]: "Labour" } },
         raw: true,
       }),
+      Expense.findOne({
+        attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total"]],
+        where: {
+          ...baseWhere,
+          crop_id: null,
+          category: "Labour",
+          [Op.or]: [
+            { expense_source: "bhagyaUpad" },
+            { labour_contract: { [Op.contains]: { sourceTag: "bhagyaUpad" } } },
+          ],
+        },
+        raw: true,
+      }),
     ]);
     const extraIncomeTotal = parseFloat(extraIncomeRow?.total) || 0;
+    const tractorIncomeTotal = parseFloat(tractorIncomeRow?.total) || 0;
     const extraExpenseTotal = parseFloat(extraExpenseRow?.total) || 0;
+    const bhagyaUpadTotal = parseFloat(bhagyaUpadRow?.total) || 0;
 
     const totalArea = crops.reduce((sum, c) => sum + (parseFloat(c.area) || 0), 0);
 
@@ -231,6 +251,8 @@ router.get(
         cropExpense: cropExpenseTotal,
         extraIncome: extraIncomeTotal,
         extraExpense: extraExpenseTotal,
+        tractorIncome: tractorIncomeTotal,
+        bhagyaUpadTotal,
       },
     });
   })

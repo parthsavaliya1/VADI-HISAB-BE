@@ -43,7 +43,7 @@ async function createPendingTractorChargeNotification({
   return Notification.create({
     user_id: recipientUserId,
     type: "Pending Tractor Charge",
-    title: "ટ્રેક્ટર ચાર્જ બાકી છે",
+    title: "ટ્રેક્ટર ના પૈસા બાકી છે",
     message: `${providerName} એ ${serviceLabel} માટે ₹${amountText} નો બાકી ચાર્જ ઉમેર્યો છે.`,
     reference_type: sourceType,
     reference_id: sourceId,
