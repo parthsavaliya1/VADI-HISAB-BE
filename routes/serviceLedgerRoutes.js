@@ -3,6 +3,7 @@ const router = express.Router();
 const { ServiceLedger, User, mapRow } = require("../models");
 const auth = require("../middleware/authMiddleware");
 const { Op } = require("sequelize");
+const { createPendingTractorChargeNotification } = require("../utils/notificationHelpers");
 
 const asyncHandler = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
@@ -19,6 +20,20 @@ function mapLedger(row) {
   o.paymentStatus = o.paymentStatus ?? row.payment_status;
   o.linkedExpenseId = o.linkedExpenseId ?? row.linked_expense_id;
   return o;
+}
+
+async function notifyPendingServiceLedger(entry, providerUserId) {
+  if (!entry || entry.payment_status !== "Pending") return;
+
+  await createPendingTractorChargeNotification({
+    recipientUserId: entry.customer_farmer_id,
+    providerUserId,
+    sourceType: "ServiceLedger",
+    sourceId: entry.id,
+    assetType: entry.service_type,
+    amount: entry.total_amount,
+    serviceDate: entry.date,
+  });
 }
 
 router.post(
@@ -43,6 +58,7 @@ router.post(
       notes: notes ?? "",
       linked_expense_id: linkedExpenseId ?? null,
     });
+    await notifyPendingServiceLedger(entry, req.user.id);
     res.status(201).json({ success: true, data: mapLedger(entry) });
   })
 );
@@ -138,7 +154,11 @@ router.patch(
       },
     });
     if (!entry) return res.status(404).json({ success: false, message: "Service entry not found." });
+    const wasPending = entry.payment_status === "Pending";
     await entry.update({ payment_status: paymentStatus });
+    if (paymentStatus === "Pending" && !wasPending) {
+      await notifyPendingServiceLedger(entry, entry.provider_id);
+    }
     res.json({ success: true, data: mapLedger(entry) });
   })
 );

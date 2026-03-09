@@ -4,6 +4,10 @@ const { Income, User, FarmerProfile, Crop, mapIncome, sequelize } = require("../
 const auth = require("../middleware/authMiddleware");
 const { Op } = require("sequelize");
 const { parseFinancialYear, getFinancialYearFromDate } = require("../utils/financialYear");
+const {
+  createPendingTractorChargeNotification,
+  findUserByPhone,
+} = require("../utils/notificationHelpers");
 
 const asyncHandler = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
@@ -23,9 +27,29 @@ function bodyToIncome(body, userId) {
   return row;
 }
 
+async function notifyPendingRentalIncome(income, providerUserId) {
+  const rentalIncome = income?.rental_income;
+  if (income?.category !== "Rental Income" || !rentalIncome) return;
+  if (rentalIncome.paymentStatus !== "Pending") return;
+
+  const recipient = await findUserByPhone(rentalIncome.farmerPhone);
+  if (!recipient) return;
+
+  await createPendingTractorChargeNotification({
+    recipientUserId: recipient.id,
+    providerUserId,
+    sourceType: "Income",
+    sourceId: income.id,
+    assetType: rentalIncome.assetType,
+    amount: income.amount ?? rentalIncome.hoursOrDays * rentalIncome.ratePerUnit,
+    serviceDate: income.date,
+  });
+}
+
 router.post("/", auth, async (req, res) => {
   try {
     const income = await Income.create(bodyToIncome(req.body, req.user.id));
+    await notifyPendingRentalIncome(income, req.user.id);
     res.status(201).json({ success: true, data: mapIncome(income) });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -197,6 +221,8 @@ router.put("/:id", auth, async (req, res) => {
   try {
     const income = await Income.findOne({ where: { id: req.params.id, user_id: req.user.id } });
     if (!income) return res.status(404).json({ success: false, message: "Income entry not found." });
+    const wasPendingRentalIncome =
+      income.category === "Rental Income" && income.rental_income?.paymentStatus === "Pending";
     const { cropId, category, date, notes, cropSale, subsidy, rentalIncome, otherIncome } = req.body;
     if (category !== undefined) income.category = category;
     if (date !== undefined) income.date = date;
@@ -207,6 +233,11 @@ router.put("/:id", auth, async (req, res) => {
     if (rentalIncome !== undefined) income.rental_income = rentalIncome;
     if (otherIncome !== undefined) income.other_income = otherIncome;
     await income.save();
+    const isPendingRentalIncome =
+      income.category === "Rental Income" && income.rental_income?.paymentStatus === "Pending";
+    if (isPendingRentalIncome && !wasPendingRentalIncome) {
+      await notifyPendingRentalIncome(income, req.user.id);
+    }
     res.json({ success: true, data: mapIncome(income) });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });

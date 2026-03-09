@@ -272,6 +272,31 @@ User.hasMany(ServiceLedger, { foreignKey: "customer_farmer_id" });
 ServiceLedger.belongsTo(User, { as: "Provider", foreignKey: "provider_id" });
 ServiceLedger.belongsTo(User, { as: "Customer", foreignKey: "customer_farmer_id" });
 
+// ─── Notification ───────────────────────────────────────────────────────────────
+const Notification = sequelize.define(
+  "Notification",
+  {
+    id: {
+      type: Sequelize.UUID,
+      defaultValue: Sequelize.UUIDV4,
+      primaryKey: true,
+    },
+    user_id: { type: Sequelize.UUID, allowNull: false, references: { model: "users", key: "id" } },
+    type: { type: Sequelize.STRING(50), allowNull: false, defaultValue: "General" },
+    title: { type: Sequelize.STRING(160), allowNull: false },
+    message: { type: Sequelize.STRING(500), allowNull: false },
+    reference_type: { type: Sequelize.STRING(40), allowNull: true, defaultValue: null },
+    reference_id: { type: Sequelize.UUID, allowNull: true, defaultValue: null },
+    meta: { type: Sequelize.JSONB, allowNull: false, defaultValue: {} },
+    is_read: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
+    read_at: { type: Sequelize.DATE, allowNull: true, defaultValue: null },
+  },
+  { tableName: "notifications" }
+);
+
+User.hasMany(Notification, { foreignKey: "user_id" });
+Notification.belongsTo(User, { foreignKey: "user_id" });
+
 // ─── Map Sequelize row to API shape (camelCase + _id) ─────────────────────────
 function mapRow(row) {
   if (!row) return null;
@@ -335,6 +360,17 @@ function mapExpense(row) {
   return o;
 }
 
+function mapNotification(row) {
+  const o = mapRow(row);
+  if (!o) return o;
+  o.userId = o.userId ?? row.user_id;
+  o.referenceType = o.referenceType ?? row.reference_type;
+  o.referenceId = o.referenceId ?? row.reference_id;
+  o.isRead = o.isRead ?? row.is_read;
+  o.readAt = o.readAt ?? row.read_at;
+  return o;
+}
+
 ServiceLedger.beforeCreate((ledger) => {
   if (ledger.area_bigha != null && ledger.rate_per_bigha != null)
     ledger.total_amount = +(parseFloat(ledger.area_bigha) * parseFloat(ledger.rate_per_bigha)).toFixed(2);
@@ -371,10 +407,12 @@ module.exports = {
   Income,
   Expense,
   ServiceLedger,
+  Notification,
   Location,
   toApiShape,
   mapRow,
   mapCrop,
   mapIncome,
   mapExpense,
+  mapNotification,
 };
