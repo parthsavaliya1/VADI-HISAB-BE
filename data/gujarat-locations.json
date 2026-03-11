@@ -1,10 +1,429 @@
 {
-  "Rajkot": { "label": "રાજકોટ", "talukas": { "Rajkot": { "label": "રાજકોટ", "villages": [{"value": "Rajkot", "label": "રાજકોટ"}, {"value": "Kothariya", "label": "કોઠારિયા"}, {"value": "Mavdi", "label": "માવડી"}, {"value": "Aji", "label": "આજી"}] }, "Gondal": { "label": "ગોંડલ", "villages": [{"value": "Gondal", "label": "ગોંડલ"}, {"value": "Sardhar", "label": "સરધાર"}, {"value": "Bedi", "label": "બેડી"}, {"value": "Navagam", "label": "નવાગામ"}] }, "Jasdan": { "label": "જસદણ", "villages": [{"value": "Jasdan", "label": "જસદણ"}, {"value": "Malia", "label": "માળિયા"}, {"value": "Vinchhiya", "label": "વિંછીયા"}] }, "Jetpur": { "label": "જેતપુર", "villages": [{"value": "Jetpur", "label": "જેતપુર"}, {"value": "Savar", "label": "સાવર"}, {"value": "Bhanvad", "label": "ભાણવડ"}] }, "Lodhika": { "label": "લોધિકા", "villages": [{"value": "Lodhika", "label": "લોધિકા"}, {"value": "Shapar", "label": "શાપર"}, {"value": "Veraval", "label": "વેરાવળ"}] }, "Paddhari": { "label": "પડધરી", "villages": [{"value": "Paddhari", "label": "પડધરી"}, {"value": "Virpur", "label": "વીરપુર"}] }, "Dhoraji": { "label": "ધોરાજી", "villages": [{"value": "Dhoraji", "label": "ધોરાજી"}, {"value": "Upleta", "label": "ઉપલેટા"}] } } },
-  "Jamnagar": { "label": "જામનગર", "talukas": { "Jamnagar": { "label": "જામનગર", "villages": [{"value": "Jamnagar", "label": "જામનગર"}, {"value": "Balachadi", "label": "બાળાછડી"}, {"value": "Sikka", "label": "સિક્કા"}, {"value": "Reldi", "label": "રેળડી"}] }, "Kalavad": { "label": "કાળાવડ", "villages": [{"value": "Kalavad", "label": "કાળાવડ"}, {"value": "Khijadia", "label": "ખીજડીયા"}, {"value": "Vadinar", "label": "વાડીનાર"}, {"value": "Mota Bhandariya", "label": "મોટા ભંડારિયા"}, {"value": "Pardi", "label": "પારડી"}, {"value": "Asota", "label": "અસોટા"}] }, "Dhrol": { "label": "ઢ્રોળ", "villages": [{"value": "Dhrol", "label": "ઢ્રોળ"}, {"value": "Joshipura", "label": "જોષીપુરા"}, {"value": "Mota Mva", "label": "મોટા મ્વા"}] }, "Lalpur": { "label": "લાલપુર", "villages": [{"value": "Lalpur", "label": "લાલપુર"}, {"value": "Shedub", "label": "શેઢૂ"}, {"value": "Navagam Ghed", "label": "નવાગામ ઘેડ"}] }, "Okha": { "label": "ઓખા", "villages": [{"value": "Okha", "label": "ઓખા"}, {"value": "Beyt", "label": "બેટ"}, {"value": "Mithapur", "label": "મિઠાપુર"}] }, "Jodiya": { "label": "જોડિયા", "villages": [{"value": "Jodiya", "label": "જોડિયા"}, {"value": "Salaya", "label": "સાલાયા"}] } } },
-  "Junagadh": { "label": "જૂનાગઢ", "talukas": { "Junagadh": { "label": "જૂનાગઢ", "villages": [{"value": "Junagadh", "label": "જૂનાગઢ"}, {"value": "Bilkha", "label": "બિળખા"}, {"value": "Sarki", "label": "સારકી"}] }, "Keshod": { "label": "કેશોદ", "villages": [{"value": "Keshod", "label": "કેશોદ"}, {"value": "Navagadh", "label": "નવાગઢ"}, {"value": "Chorvad", "label": "ચોરવાડ"}] }, "Veraval": { "label": "વેરાવળ", "villages": [{"value": "Veraval", "label": "વેરાવળ"}, {"value": "Sutrapada", "label": "સૂત્રાપાડા"}, {"value": "Prabhas Patan", "label": "પ્રભાસ પાટણ"}] }, "Mangrol": { "label": "માંગરોળ", "villages": [{"value": "Mangrol", "label": "માંગરોળ"}, {"value": "Tulsishyam", "label": "તુલસીશ્યામ"}] }, "Visavadar": { "label": "વિસાવદર", "villages": [{"value": "Visavadar", "label": "વિસાવદર"}, {"value": "Shiyal", "label": "શિયાળ"}] } } },
-  "Amreli": { "label": "અમરેલી", "talukas": { "Amreli": { "label": "અમરેલી", "villages": [{"value": "Amreli", "label": "અમરેલી"}, {"value": "Khambha", "label": "ખાંભા"}, {"value": "Dhari", "label": "ધારી"}] }, "Rajula": { "label": "રાજુળા", "villages": [{"value": "Rajula", "label": "રાજુળા"}, {"value": "Pipaliya", "label": "પિપળિયા"}, {"value": "Kukavav", "label": "કૂકાવાવ"}] }, "Savarkundla": { "label": "સાવરકુંડલા", "villages": [{"value": "Savarkundla", "label": "સાવરકુંડલા"}, {"value": "Babra", "label": "બાબરા"}] }, "Lathi": { "label": "લાઠી", "villages": [{"value": "Lathi", "label": "લાઠી"}, {"value": "Liliya", "label": "લીલિયા"}] } } },
-  "Morbi": { "label": "મોરબી", "talukas": { "Morbi": { "label": "મોરબી", "villages": [{"value": "Morbi", "label": "મોરબી"}, {"value": "Tankara", "label": "ટંકારા"}, {"value": "Navlakhi", "label": "નવલખી"}] }, "Wankaner": { "label": "વાંકાનેર", "villages": [{"value": "Wankaner", "label": "વાંકાનેર"}, {"value": "Halvad", "label": "હળવદ"}, {"value": "Muli", "label": "મૂળી"}] }, "Maliya": { "label": "માળિયા", "villages": [{"value": "Maliya Miyana", "label": "માળિયા મિયાણા"}, {"value": "Zarpara", "label": "ઝારપારા"}] } } },
-  "Bhavnagar": { "label": "ભાવનગર", "talukas": { "Bhavnagar": { "label": "ભાવનગર", "villages": [{"value": "Bhavnagar", "label": "ભાવનગર"}, {"value": "Ghogha", "label": "ઘોઘા"}, {"value": "Vadodara", "label": "વડોદરા"}] }, "Sihor": { "label": "સિહોર", "villages": [{"value": "Sihor", "label": "સિહોર"}, {"value": "Palitana", "label": "પાળિતાણા"}, {"value": "Gariadhar", "label": "ગારિયાધાર"}] }, "Mahuva": { "label": "મહુવા", "villages": [{"value": "Mahuva", "label": "મહુવા"}, {"value": "Talaja", "label": "તળાજા"}] }, "Umrala": { "label": "ઉમરાળા", "villages": [{"value": "Umrala", "label": "ઉમરાળા"}, {"value": "Vallabhipur", "label": "વલ્લભીપુર"}] } } },
-  "Surendranagar": { "label": "સુરેન્દ્રનગર", "talukas": { "Surendranagar": { "label": "સુરેન્દ્રનગર", "villages": [{"value": "Surendranagar", "label": "સુરેન્દ્રનગર"}, {"value": "Wadhwan", "label": "વઢવાણ"}, {"value": "Rampara", "label": "રામપરા"}] }, "Chotila": { "label": "ચોટીલા", "villages": [{"value": "Chotila", "label": "ચોટીલા"}, {"value": "Sayla", "label": "સાયળા"}, {"value": "Thangadh", "label": "થાંગઢ"}] }, "Dhrangadhra": { "label": "ધ્રાંગધ્રા", "villages": [{"value": "Dhrangadhra", "label": "ધ્રાંગધ્રા"}, {"value": "Limbdi", "label": "લીંબડી"}] }, "Lakhtar": { "label": "લખતર", "villages": [{"value": "Lakhtar", "label": "લખતર"}, {"value": "Dasada", "label": "દસાડા"}] } } },
-  "Other": { "label": "અન્ય", "talukas": { "Other": { "label": "અન્ય", "villages": [{"value": "Other", "label": "અન્ય"}] } } }
+  "Rajkot": {
+    "label": "રાજકોટ",
+    "talukas": {
+      "Rajkot": {
+        "label": "રાજકોટ",
+        "villages": [
+          { "value": "Rajkot", "label": "રાજકોટ" },
+          { "value": "Kothariya", "label": "કોઠારિયા" },
+          { "value": "Mavdi", "label": "મવડી" },
+          { "value": "Aji", "label": "આજી" },
+          { "value": "Munjka", "label": "મુંજકા" },
+          { "value": "Mota Mava", "label": "મોટા મવા" },
+          { "value": "Madhapar", "label": "માધાપર" },
+          { "value": "Raiya", "label": "રૈયા" },
+          { "value": "Vavdi", "label": "વાવડી" },
+          { "value": "Vavdi Dharampur", "label": "વાવડી ધરમપુર" },
+          { "value": "Kangsiyali", "label": "કાંગસિયાળી" },
+          { "value": "Sardhar", "label": "સરધાર" },
+          { "value": "Bedi", "label": "બેડી" },
+          { "value": "Ishwariya", "label": "ઈશ્વરિયા" },
+          { "value": "Targhadiya", "label": "તરઘડિયા" },
+          { "value": "Manharpur", "label": "મનહરપુર" },
+          { "value": "Kasturbadham", "label": "કસ્તુરબાધામ" },
+          { "value": "Hadala", "label": "હડાળા" },
+          { "value": "Para Pipaliya", "label": "પરા પિપળિયા" },
+          { "value": "Thorala", "label": "થોરાળા" },
+          { "value": "Vankaner Road", "label": "વાંકાનેર રોડ" },
+          { "value": "Bhupgadh", "label": "ભૂપગઢ" },
+          { "value": "Navagam", "label": "નવાગામ" },
+          { "value": "Satda", "label": "સાતડા" },
+          { "value": "Ratanpar", "label": "રતનપર" },
+          { "value": "Rampara", "label": "રામપરા" },
+          { "value": "Kotharia Solvent", "label": "કોઠારિયા સોલ્વેન્ટ" }
+        ]
+      },
+      "Gondal": {
+        "label": "ગોંડલ",
+        "villages": [
+          { "value": "Gondal", "label": "ગોંડલ" },
+          { "value": "Sardhar", "label": "સરધાર" },
+          { "value": "Bedi", "label": "બેડી" },
+          { "value": "Navagam", "label": "નવાગામ" }
+        ]
+      },
+      "Jasdan": {
+        "label": "જસદણ",
+        "villages": [
+          { "value": "Jasdan", "label": "જસદણ" },
+          { "value": "Malia", "label": "માળિયા" },
+          { "value": "Vinchhiya", "label": "વિંછીયા" }
+        ]
+      },
+      "Jetpur": {
+        "label": "જેતપુર",
+        "villages": [
+          { "value": "Jetpur", "label": "જેતપુર" },
+          { "value": "Savar", "label": "સાવર" },
+          { "value": "Bhanvad", "label": "ભાણવડ" }
+        ]
+      },
+      "Lodhika": {
+        "label": "લોધિકા",
+        "villages": [
+          { "value": "Lodhika", "label": "લોધિકા" },
+          { "value": "Shapar", "label": "શાપર" },
+          { "value": "Veraval", "label": "વેરાવળ" }
+        ]
+      },
+      "Paddhari": {
+        "label": "પડધરી",
+        "villages": [
+          { "value": "Paddhari", "label": "પડધરી" },
+          { "value": "Virpur", "label": "વીરપુર" }
+        ]
+      },
+      "Dhoraji": {
+        "label": "ધોરાજી",
+        "villages": [
+          { "value": "Dhoraji", "label": "ધોરાજી" },
+          { "value": "Upleta", "label": "ઉપલેટા" }
+        ]
+      }
+    }
+  },
+  "Jamnagar": {
+    "label": "જામનગર",
+    "talukas": {
+      "Jamnagar": {
+        "label": "જામનગર",
+        "villages": [
+          { "value": "Jamnagar", "label": "જામનગર" },
+          { "value": "Balachadi", "label": "બાળાછડી" },
+          { "value": "Sikka", "label": "સિક્કા" },
+          { "value": "Reldi", "label": "રેળડી" }
+        ]
+      },
+      "Kalavad": {
+        "label": "કાલાવડ",
+        "villages": [
+          { "value": "Kalavad", "label": "કાલાવડ" },
+          { "value": "Khijadia", "label": "ખીજડીયા" },
+          { "value": "Vadinar", "label": "વાડીનાર" },
+          { "value": "Mota Bhandariya", "label": "મોટા ભંડારિયા" },
+          { "value": "Pardi", "label": "પારડી" },
+          { "value": "Asota", "label": "અસોટા" },
+          { "value": "Anandpar", "label": "આણંદપર" },
+          { "value": "Arala", "label": "આરાળા" },
+          { "value": "Balambhadi", "label": "બાલંભાડી" },
+          { "value": "Bamangam", "label": "બામણગામ" },
+          { "value": "Banga", "label": "બંગા" },
+          { "value": "Bava Khakhariya", "label": "બાવા ખાખરિયા" },
+          { "value": "Bediya", "label": "બેડિયા" },
+          { "value": "Beraja", "label": "બેરાજા" },
+          { "value": "Bhangda", "label": "ભાંગડા" },
+          { "value": "Bhimanugam", "label": "ભીમાણુગામ" },
+          { "value": "Bodi", "label": "બોડી" },
+          { "value": "Chapra", "label": "છાપરા" },
+          { "value": "Chela Bedi", "label": "ચેલા બેડી" },
+          { "value": "Chhatar", "label": "છતર" },
+          { "value": "Dangarvada", "label": "ડાંગરવાડા" },
+          { "value": "Davli", "label": "દાવલી" },
+          { "value": "Deri", "label": "દેરી" },
+          { "value": "Dhundhoraji", "label": "ધુંધોરાજી" },
+          { "value": "Dudhala", "label": "દુધાળા" },
+          { "value": "Fagas", "label": "ફાગાસ" },
+          { "value": "Galpadar", "label": "ગાલપાદર" },
+          { "value": "Golaniya", "label": "ગોલાણિયા" },
+          { "value": "Gunda", "label": "ગુન્ડા" },
+          { "value": "Hansthal", "label": "હાંસથળ" },
+          { "value": "Haripar", "label": "હરીપર" },
+          { "value": "Jalansar", "label": "જલાન્સર" },
+          { "value": "Jamvali", "label": "જામવાળી" },
+          { "value": "Jashapar", "label": "જશાપર" },
+          { "value": "Jivapar", "label": "જીવાપર" },
+          { "value": "Juvanpar", "label": "જુવાનપર" },
+          { "value": "Kalmeghada", "label": "કલમેઘડા" },
+          { "value": "Khad Dhoraji", "label": "ખડ ધોરાજી" },
+          { "value": "Khan Kotda", "label": "ખાનકોટડા" },
+          { "value": "Khandhera", "label": "ખંધેરા" },
+          { "value": "Kharedi", "label": "ખારેડી" },
+          { "value": "Kotha Bhadukiya", "label": "કોઠા ભડુકિયા" },
+          { "value": "Laloi", "label": "લાલોઈ" },
+          { "value": "Machhalivad", "label": "માછલીવાડ" },
+          { "value": "Machharda", "label": "માછરડા" },
+          { "value": "Metiya", "label": "મેટિયા" },
+          { "value": "Moridad", "label": "મોરીદાદ" },
+          { "value": "Morvadi", "label": "મોરવાડી" },
+          { "value": "Mota Vadala", "label": "મોટા વડાળા" },
+          { "value": "Moti Bhagedi", "label": "મોટી ભાગેડી" },
+          { "value": "Moti Nagajar", "label": "મોટી નાગાજર" },
+          { "value": "Mulila", "label": "મૂળીલા" },
+          { "value": "Nagpur", "label": "નાગપુર" },
+          { "value": "Nana Vadala", "label": "નાના વડાળા" },
+          { "value": "Nani Bhagedi", "label": "નાની ભાગેડી" },
+          { "value": "Navagam", "label": "નવાગામ" },
+          { "value": "Nikava", "label": "નિકાવા" },
+          { "value": "Pipar", "label": "પીપર" },
+          { "value": "Pithadiya", "label": "પીઠડિયા" },
+          { "value": "Rajda", "label": "રાજડા" },
+          { "value": "Rajsthali", "label": "રાજસ્થળી" },
+          { "value": "Rampar", "label": "રામપર" },
+          { "value": "Ravashiya", "label": "રાવશિયા" },
+          { "value": "Sanala", "label": "સણાલા" },
+          { "value": "Sarapadar", "label": "સરાપાદર" },
+          { "value": "Sarvaniya", "label": "સરવાણિયા" },
+          { "value": "Satiya", "label": "સતિયા" },
+          { "value": "Savli", "label": "સાવલી" },
+          { "value": "Shishang", "label": "શિશાંગ" },
+          { "value": "Sortha", "label": "સોરઠા" },
+          { "value": "Toda", "label": "ટોડા" },
+          { "value": "Umrala", "label": "ઉમરાળા" },
+          { "value": "Virvav", "label": "વીરવાવ" },
+          { "value": "Vodisang", "label": "વોડીસંગ" }
+        ]
+      },
+      "Jamjodhpur": {
+        "label": "જામજોધપુર",
+        "villages": [
+          { "value": "Jamjodhpur", "label": "જામજોધપુર" },
+          { "value": "Balambha", "label": "બાલંભા" },
+          { "value": "Dharampur", "label": "ધરમપુર" }
+        ]
+      },
+      "Bhanvad": {
+        "label": "ભાણવડ",
+        "villages": [
+          { "value": "Bhanvad", "label": "ભાણવડ" },
+          { "value": "Gunda", "label": "ગુન્ડા" },
+          { "value": "Ranavav", "label": "રણાવાવ" }
+        ]
+      },
+      "Kalyanpur": {
+        "label": "કલ્યાણપુર",
+        "villages": [
+          { "value": "Kalyanpur", "label": "કલ્યાણપુર" },
+          { "value": "Bhatia", "label": "ભાટિયા" },
+          { "value": "Harshad", "label": "હર્ષદ" }
+        ]
+      },
+      "Khambhalia": {
+        "label": "ખંભાળિયા",
+        "villages": [
+          { "value": "Khambhalia", "label": "ખંભાળિયા" },
+          { "value": "Salaya", "label": "સાલાયા" },
+          { "value": "Dwarka Road", "label": "દ્વારકા રોડ" }
+        ]
+      },
+      "Dhrol": {
+        "label": "ઢ્રોળ",
+        "villages": [
+          { "value": "Dhrol", "label": "ઢ્રોળ" },
+          { "value": "Joshipura", "label": "જોષીપુરા" },
+          { "value": "Mota Mva", "label": "મોટા મ્વા" }
+        ]
+      },
+      "Lalpur": {
+        "label": "લાલપુર",
+        "villages": [
+          { "value": "Lalpur", "label": "લાલપુર" },
+          { "value": "Shedub", "label": "શેઢૂ" },
+          { "value": "Navagam Ghed", "label": "નવાગામ ઘેડ" }
+        ]
+      },
+      "Okha": {
+        "label": "ઓખા",
+        "villages": [
+          { "value": "Okha", "label": "ઓખા" },
+          { "value": "Beyt", "label": "બેટ" },
+          { "value": "Mithapur", "label": "મિઠાપુર" }
+        ]
+      },
+      "Jodiya": {
+        "label": "જોડિયા",
+        "villages": [
+          { "value": "Jodiya", "label": "જોડિયા" },
+          { "value": "Salaya", "label": "સાલાયા" }
+        ]
+      }
+    }
+  },
+  "Junagadh": {
+    "label": "જૂનાગઢ",
+    "talukas": {
+      "Junagadh": {
+        "label": "જૂનાગઢ",
+        "villages": [
+          { "value": "Junagadh", "label": "જૂનાગઢ" },
+          { "value": "Bilkha", "label": "બિળખા" },
+          { "value": "Sarki", "label": "સારકી" }
+        ]
+      },
+      "Keshod": {
+        "label": "કેશોદ",
+        "villages": [
+          { "value": "Keshod", "label": "કેશોદ" },
+          { "value": "Navagadh", "label": "નવાગઢ" },
+          { "value": "Chorvad", "label": "ચોરવાડ" }
+        ]
+      },
+      "Veraval": {
+        "label": "વેરાવળ",
+        "villages": [
+          { "value": "Veraval", "label": "વેરાવળ" },
+          { "value": "Sutrapada", "label": "સૂત્રાપાડા" },
+          { "value": "Prabhas Patan", "label": "પ્રભાસ પાટણ" }
+        ]
+      },
+      "Mangrol": {
+        "label": "मेंગરોળ",
+        "villages": [
+          { "value": "Mangrol", "label": "માંગરોળ" },
+          { "value": "Tulsishyam", "label": "તુલસીશ્યામ" }
+        ]
+      },
+      "Visavadar": {
+        "label": "વિસાવદર",
+        "villages": [
+          { "value": "Visavadar", "label": "વિસાવદર" },
+          { "value": "Shiyal", "label": "શિયાળ" }
+        ]
+      }
+    }
+  },
+  "Amreli": {
+    "label": "અમરેલી",
+    "talukas": {
+      "Amreli": {
+        "label": "અમરેલી",
+        "villages": [
+          { "value": "Amreli", "label": "અમરેલી" },
+          { "value": "Khambha", "label": "ખાંભા" },
+          { "value": "Dhari", "label": "ધારી" }
+        ]
+      },
+      "Rajula": {
+        "label": "રાજુળા",
+        "villages": [
+          { "value": "Rajula", "label": "રાજુળા" },
+          { "value": "Pipaliya", "label": "પિપળિયા" },
+          { "value": "Kukavav", "label": "કૂકાવાવ" }
+        ]
+      },
+      "Savarkundla": {
+        "label": "સાવરકુંડલા",
+        "villages": [
+          { "value": "Savarkundla", "label": "સાવરકુંડલા" },
+          { "value": "Babra", "label": "બાબરા" }
+        ]
+      },
+      "Lathi": {
+        "label": "લાઠી",
+        "villages": [
+          { "value": "Lathi", "label": "લાઠી" },
+          { "value": "Liliya", "label": "લીલિયા" }
+        ]
+      }
+    }
+  },
+  "Morbi": {
+    "label": "મોરબી",
+    "talukas": {
+      "Morbi": {
+        "label": "મોરબી",
+        "villages": [
+          { "value": "Morbi", "label": "મોરબી" },
+          { "value": "Tankara", "label": "ટંકારા" },
+          { "value": "Navlakhi", "label": "નવલખી" }
+        ]
+      },
+      "Wankaner": {
+        "label": "વાંકાનેર",
+        "villages": [
+          { "value": "Wankaner", "label": "વાંકાનેર" },
+          { "value": "Halvad", "label": "હળવદ" },
+          { "value": "Muli", "label": "મૂળી" }
+        ]
+      },
+      "Maliya": {
+        "label": "માળિયા",
+        "villages": [
+          { "value": "Maliya Miyana", "label": "માળિયા મિયાણા" },
+          { "value": "Zarpara", "label": "ઝારપારા" }
+        ]
+      }
+    }
+  },
+  "Bhavnagar": {
+    "label": "ભાવનગર",
+    "talukas": {
+      "Bhavnagar": {
+        "label": "ભાવનગર",
+        "villages": [
+          { "value": "Bhavnagar", "label": "ભાવનગર" },
+          { "value": "Ghogha", "label": "ઘોઘા" },
+          { "value": "Vadodara", "label": "વડોદરા" }
+        ]
+      },
+      "Sihor": {
+        "label": "સિહોર",
+        "villages": [
+          { "value": "Sihor", "label": "સિહોર" },
+          { "value": "Palitana", "label": "પાળિતાણા" },
+          { "value": "Gariadhar", "label": "ગારિયાધાર" }
+        ]
+      },
+      "Mahuva": {
+        "label": "મહુવા",
+        "villages": [
+          { "value": "Mahuva", "label": "મહુવા" },
+          { "value": "Talaja", "label": "તળાજા" }
+        ]
+      },
+      "Umrala": {
+        "label": "ઉમરાળા",
+        "villages": [
+          { "value": "Umrala", "label": "ઉમરાળા" },
+          { "value": "Vallabhipur", "label": "વલ્લભીપુર" }
+        ]
+      }
+    }
+  },
+  "Surendranagar": {
+    "label": "સુરેન્દ્રનગર",
+    "talukas": {
+      "Surendranagar": {
+        "label": "સુરેન્દ્રનગર",
+        "villages": [
+          { "value": "Surendranagar", "label": "સુરેન્દ્રનગર" },
+          { "value": "Wadhwan", "label": "વઢવાણ" },
+          { "value": "Rampara", "label": "રામપરા" }
+        ]
+      },
+      "Chotila": {
+        "label": "ચોટીલા",
+        "villages": [
+          { "value": "Chotila", "label": "ચોટીલા" },
+          { "value": "Sayla", "label": "સાયળા" },
+          { "value": "Thangadh", "label": "થાંગઢ" }
+        ]
+      },
+      "Dhrangadhra": {
+        "label": "ધ્રાંગધ્રા",
+        "villages": [
+          { "value": "Dhrangadhra", "label": "ધ્રાંગધ્રા" },
+          { "value": "Limbdi", "label": "લીંબડી" }
+        ]
+      },
+      "Lakhtar": {
+        "label": "લખતર",
+        "villages": [
+          { "value": "Lakhtar", "label": "લખતર" },
+          { "value": "Dasada", "label": "દસાડા" }
+        ]
+      }
+    }
+  },
+  "Other": {
+    "label": "અન્ય",
+    "talukas": {
+      "Other": {
+        "label": "અન્ય",
+        "villages": [
+          { "value": "Other", "label": "અન્ય" }
+        ]
+      }
+    }
+  }
 }
