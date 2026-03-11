@@ -259,10 +259,44 @@ router.get(
 );
 
 router.get(
+  "/report/compare/users",
+  auth,
+  asyncHandler(async (req, res) => {
+    // List other farmers who have enabled data sharing, for peer comparison dropdown.
+    const myProfile = await FarmerProfile.findOne({
+      where: { user_id: req.user.id },
+      attributes: ["data_sharing"],
+    });
+
+    if (!myProfile || myProfile.data_sharing !== true) {
+      return res.json({ success: true, peers: [] });
+    }
+
+    const profiles = await FarmerProfile.findAll({
+      where: { data_sharing: true },
+      attributes: ["user_id", "name", "village", "taluka", "district"],
+      order: [["village", "ASC"], ["name", "ASC"]],
+    });
+
+    const peers = profiles
+      .filter((p) => p.user_id !== req.user.id)
+      .map((p) => ({
+        userId: p.user_id,
+        name: p.name,
+        village: p.village,
+        taluka: p.taluka,
+        district: p.district,
+      }));
+
+    res.json({ success: true, peers });
+  })
+);
+
+router.get(
   "/report/compare",
   auth,
   asyncHandler(async (req, res) => {
-    const { financialYear, cropName } = req.query;
+    const { financialYear, cropName, peerUserId } = req.query;
     const fy = typeof financialYear === "string" && financialYear
       ? financialYear
       : getFinancialYearFromDate();
@@ -315,8 +349,21 @@ router.get(
     const myProfile = await FarmerProfile.findOne({ where: { user_id: req.user.id }, attributes: ["data_sharing"] });
     const myConsent = myProfile?.data_sharing === true;
     let avgIncome = 0, avgExpense = 0, avgIncomePerBigha = 0, percentileIncome = null, percentileExpense = null, sampleSize = 0;
+    let mode = "average";
+    let peerUserIdOut = null;
+    let peerName = null;
+    let peerVillage = null;
+    let peerTaluka = null;
+    let peerDistrict = null;
+    let peerIncome = null;
+    let peerExpense = null;
+    let peerIncomePerBigha = null;
+
     if (myConsent) {
-      const consentedProfiles = await FarmerProfile.findAll({ where: { data_sharing: true }, attributes: ["user_id"] });
+      const consentedProfiles = await FarmerProfile.findAll({
+        where: { data_sharing: true },
+        attributes: ["user_id", "name", "village", "taluka", "district"],
+      });
       const consentedIds = consentedProfiles.map((p) => p.user_id).filter((id) => id !== req.user.id);
       if (consentedIds.length) {
         const allCrops = await Crop.findAll({
@@ -354,18 +401,40 @@ router.get(
           return { userId: uid, income, expense, area: areaNum, incomePerBigha };
         });
         sampleSize = userTotals.length;
+
+        // When a specific peer farmer is selected, compute comparison metrics
+        // against that peer as well as overall averages.
+        const peerTotals = peerUserId
+          ? userTotals.find((u) => String(u.userId) === String(peerUserId))
+          : null;
+
+        if (peerTotals) {
+          mode = "peer";
+          peerUserIdOut = peerTotals.userId;
+          const profile = consentedProfiles.find((p) => String(p.user_id) === String(peerTotals.userId));
+          peerName = profile ? profile.name : null;
+          peerVillage = profile ? profile.village : null;
+          peerTaluka = profile ? profile.taluka : null;
+          peerDistrict = profile ? profile.district : null;
+          peerIncome = +peerTotals.income.toFixed(2);
+          peerExpense = +peerTotals.expense.toFixed(2);
+          peerIncomePerBigha = +peerTotals.incomePerBigha.toFixed(2);
+        }
+
         if (sampleSize) {
           avgIncome = userTotals.reduce((a, u) => a + u.income, 0) / sampleSize;
           avgExpense = userTotals.reduce((a, u) => a + u.expense, 0) / sampleSize;
           const withArea = userTotals.filter((u) => u.area > 0);
-          const avgIncomePerBighaNum = withArea.length ? withArea.reduce((a, u) => a + u.incomePerBigha, 0) / withArea.length : 0;
+          const avgIncomePerBighaNum = withArea.length
+            ? withArea.reduce((a, u) => a + u.incomePerBigha, 0) / withArea.length
+            : 0;
           avgIncomePerBigha = +avgIncomePerBighaNum.toFixed(2);
           const incomeSorted = userTotals.map((u) => u.income).sort((a, b) => a - b);
           const expenseSorted = userTotals.map((u) => u.expense).sort((a, b) => a - b);
           const belowIncome = incomeSorted.filter((v) => v < myTotalIncome).length;
           const belowExpense = expenseSorted.filter((v) => v < myTotalExpense).length;
-          percentileIncome = +(belowIncome / sampleSize * 100).toFixed(1);
-          percentileExpense = +(belowExpense / sampleSize * 100).toFixed(1);
+          percentileIncome = +((belowIncome / sampleSize) * 100).toFixed(1);
+          percentileExpense = +((belowExpense / sampleSize) * 100).toFixed(1);
         }
       }
     }
@@ -387,6 +456,15 @@ router.get(
       percentileIncome,
       percentileExpense,
       sampleSize,
+      mode,
+      peerUserId: peerUserIdOut,
+      peerName,
+      peerVillage,
+      peerTaluka,
+      peerDistrict,
+      peerIncome,
+      peerExpense,
+      peerIncomePerBigha,
     });
   })
 );

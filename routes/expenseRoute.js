@@ -165,7 +165,7 @@ router.get(
   "/analytics",
   auth,
   asyncHandler(async (req, res) => {
-    const { financialYear } = req.query;
+    const { financialYear, peerUserId } = req.query;
     const fy = financialYear || getFinancialYearFromDate();
     const range = parseFinancialYear(fy);
     if (!range) {
@@ -212,9 +212,36 @@ router.get(
     let avgByCategory = {};
     let avgPerBighaByCategory = {};
     let sampleSize = 0;
+    let mode = "average";
+    let peerUserIdOut = null;
+    let peerName = null;
+    let peerVillage = null;
+    let peerTaluka = null;
+    let peerDistrict = null;
+
     if (myConsent) {
-      const consented = await FarmerProfile.findAll({ where: { data_sharing: true }, attributes: ["user_id"] });
-      const consentedIds = consented.map((p) => p.user_id).filter((id) => id !== req.user.id);
+      const consented = await FarmerProfile.findAll({
+        where: { data_sharing: true },
+        attributes: ["user_id", "name", "village", "taluka", "district"],
+      });
+      let consentedIds = consented.map((p) => p.user_id).filter((id) => id !== req.user.id);
+      if (peerUserId) {
+        // If a specific peer is selected, restrict comparison set to that user only (if allowed).
+        const peerInList = consentedIds.find((id) => String(id) === String(peerUserId));
+        if (peerInList) {
+          consentedIds = [peerInList];
+          mode = "peer";
+          peerUserIdOut = peerInList;
+          const p = consented.find((pf) => String(pf.user_id) === String(peerInList));
+          if (p) {
+            peerName = p.name;
+            peerVillage = p.village;
+            peerTaluka = p.taluka;
+            peerDistrict = p.district;
+          }
+        }
+      }
+
       if (consentedIds.length > 0) {
         const [allExpenses, cropAreas] = await Promise.all([
           Expense.findAll({
@@ -256,14 +283,30 @@ router.get(
         });
         const usersWithArea = Object.entries(byUser).filter(([, v]) => v.area > 0);
         sampleSize = usersWithArea.length;
-        categories.forEach((cat) => {
-          const totals = usersWithArea.map(([, u]) => u.expense[cat] || 0);
-          avgByCategory[cat] = totals.length ? totals.reduce((a, b) => a + b, 0) / totals.length : 0;
-          const perBighaValues = usersWithArea.map(([, u]) => (u.expense[cat] || 0) / u.area);
-          avgPerBighaByCategory[cat] = perBighaValues.length
-            ? Math.round((perBighaValues.reduce((a, b) => a + b, 0) / perBighaValues.length) * 100) / 100
-            : 0;
-        });
+
+        if (mode === "peer" && peerUserIdOut) {
+          // Use only the selected peer's expense data for comparison.
+          const peerEntry = usersWithArea.find(([uid]) => String(uid) === String(peerUserIdOut));
+          const peerData = peerEntry ? peerEntry[1] : null;
+          if (peerData) {
+            categories.forEach((cat) => {
+              const total = peerData.expense[cat] || 0;
+              avgByCategory[cat] = total;
+              const perBigha = peerData.area > 0 ? total / peerData.area : 0;
+              avgPerBighaByCategory[cat] = Math.round(perBigha * 100) / 100;
+            });
+            sampleSize = 1;
+          }
+        } else {
+          categories.forEach((cat) => {
+            const totals = usersWithArea.map(([, u]) => u.expense[cat] || 0);
+            avgByCategory[cat] = totals.length ? totals.reduce((a, b) => a + b, 0) / totals.length : 0;
+            const perBighaValues = usersWithArea.map(([, u]) => (u.expense[cat] || 0) / u.area);
+            avgPerBighaByCategory[cat] = perBighaValues.length
+              ? Math.round((perBighaValues.reduce((a, b) => a + b, 0) / perBighaValues.length) * 100) / 100
+              : 0;
+          });
+        }
       }
     }
     res.json({
@@ -276,6 +319,12 @@ router.get(
       avgByCategory,
       avgPerBighaByCategory,
       sampleSize,
+      mode,
+      peerUserId: peerUserIdOut,
+      peerName,
+      peerVillage,
+      peerTaluka,
+      peerDistrict,
     });
   })
 );

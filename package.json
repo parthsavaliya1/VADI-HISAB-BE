@@ -21,6 +21,7 @@
     "expo-media-library": "^55.0.9",
     "expo-sharing": "^55.0.11",
     "express": "^5.2.1",
+    "express-async-handler": "^1.2.0",
     "jsonwebtoken": "^9.0.3",
     "node-cache": "^5.1.2",
     "pg": "^8.13.0",
