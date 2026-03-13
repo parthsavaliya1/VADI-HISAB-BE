@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
+    "start": "node index.js",
+    "dev": "nodemon index.js",
     "migrate": "node scripts/run-migration.js migrations/crop-year-to-financial-year.sql",
     "seed:locations": "node scripts/seed-locations.js"
   },
