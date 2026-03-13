@@ -5,8 +5,10 @@ const connectDB = async () => {
   try {
     await sequelize.authenticate();
     console.log("PostgreSQL connected");
+    //this is for postgres
+    //    await sequelize.sync({ alter: true });
     // Auto-sync: creates tables if missing, alters existing tables to match models (e.g. after DB reset)
-    await sequelize.sync({ alter: true });
+    await sequelize.sync();
     console.log("Database synced");
   } catch (error) {
     console.error("DB error:", error);
