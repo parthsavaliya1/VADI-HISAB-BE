@@ -10,6 +10,7 @@ Express API for the VADI Hisaab farmer app. Uses **PostgreSQL** (via Sequelize).
    - `DATABASE_URL` or `PG_URI`: e.g. `postgresql://user:password@localhost:5432/vadi_hisab`
    - `JWT_SECRET`: min 32 characters
    - `TWO_FACTOR_API_KEY`: for OTP (2Factor.in)
+- `OTP_CHANNEL` (optional): `sms` (default) or `voice` — use `voice` to send OTP via phone call instead of SMS
 
 3. **Install & run**:
    ```bash

@@ -1,10 +1,22 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const axios = require("axios");
+const crypto = require("crypto");
 const { User, FarmerProfile } = require("../models");
 const auth = require("../middleware/authMiddleware");
 
 const router = express.Router();
+
+// When OTP_CHANNEL=voice we generate OTP and send via 2Factor VOICE; we verify ourselves.
+const voiceOtpStore = new Map(); // sessionId -> { otp, phone, createdAt }
+const VOICE_OTP_TTL_MS = 10 * 60 * 1000; // 10 min
+
+function cleanupExpiredVoiceSessions() {
+  const now = Date.now();
+  for (const [sid, data] of voiceOtpStore.entries()) {
+    if (now - data.createdAt > VOICE_OTP_TTL_MS) voiceOtpStore.delete(sid);
+  }
+}
 
 function toUserResponse(user, profileConsent = null) {
   const u = user.get ? user.get({ plain: true }) : user;
@@ -27,7 +39,24 @@ router.post("/send-otp", async (req, res) => {
   if (!phone || phone.length !== 10) {
     return res.status(400).json({ message: "Valid 10-digit phone number required" });
   }
+  const channel = (process.env.OTP_CHANNEL || "sms").toLowerCase();
   try {
+    if (channel === "voice") {
+      // Voice: we generate OTP and send via 2Factor VOICE; verify is done locally.
+      cleanupExpiredVoiceSessions();
+      const otp = String(crypto.randomInt(100000, 999999));
+      const sessionId = crypto.randomUUID();
+      const response = await axios.get(
+        `https://2factor.in/API/V1/${process.env.TWO_FACTOR_API_KEY}/VOICE/${phone}/${otp}`,
+        { timeout: 15000 }
+      );
+      if (response.data.Status !== "Success") {
+        return res.status(500).json({ message: "OTP send failed", details: response.data });
+      }
+      voiceOtpStore.set(sessionId, { otp, phone, createdAt: Date.now() });
+      return res.json({ message: "OTP sent successfully (voice)", sessionId });
+    }
+    // Default: SMS via 2Factor AUTOGEN
     const response = await axios.get(
       `https://2factor.in/API/V1/${process.env.TWO_FACTOR_API_KEY}/SMS/${phone}/AUTOGEN`
     );
@@ -47,17 +76,31 @@ router.post("/verify-otp", async (req, res) => {
     return res.status(400).json({ message: "phone, otp, and sessionId are required" });
   }
   try {
-    console.log("verify-otp: TWO_FACTOR_API_KEY", process.env.TWO_FACTOR_API_KEY);
-    if (!process.env.TWO_FACTOR_API_KEY) {
-      console.error("verify-otp: TWO_FACTOR_API_KEY is missing");
-      return res.status(500).json({ message: "Server configuration error" });
-    }
-    const response = await axios.get(
-      `https://2factor.in/API/V1/${process.env.TWO_FACTOR_API_KEY}/SMS/VERIFY/${sessionId}/${otp}`,
-      { timeout: 15000 }
-    );
-    if (response.data.Status !== "Success") {
-      return res.status(400).json({ message: "Invalid or expired OTP" });
+    // Voice: verify from our store (we sent OTP via VOICE in send-otp)
+    const voiceData = voiceOtpStore.get(sessionId);
+    if (voiceData) {
+      if (voiceData.phone !== phone || voiceData.otp !== otp) {
+        return res.status(400).json({ message: "Invalid or expired OTP" });
+      }
+      if (Date.now() - voiceData.createdAt > VOICE_OTP_TTL_MS) {
+        voiceOtpStore.delete(sessionId);
+        return res.status(400).json({ message: "Invalid or expired OTP" });
+      }
+      voiceOtpStore.delete(sessionId);
+      // Fall through to create/return token (same as SMS path)
+    } else {
+      // SMS: verify via 2Factor
+      if (!process.env.TWO_FACTOR_API_KEY) {
+        console.error("verify-otp: TWO_FACTOR_API_KEY is missing");
+        return res.status(500).json({ message: "Server configuration error" });
+      }
+      const response = await axios.get(
+        `https://2factor.in/API/V1/${process.env.TWO_FACTOR_API_KEY}/SMS/VERIFY/${sessionId}/${otp}`,
+        { timeout: 15000 }
+      );
+      if (response.data.Status !== "Success") {
+        return res.status(400).json({ message: "Invalid or expired OTP" });
+      }
     }
     let user = await User.findOne({ where: { phone } });
     const isNewUser = !user;
