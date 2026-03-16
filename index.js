@@ -12,6 +12,7 @@ const vadiScoreRoutes = require("./routes/vadiScoreRoutes");
 const serviceLedgerRoutes = require("./routes/serviceLedgerRoutes");
 const locationRoutes = require("./routes/locationRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const apmcRoutes = require("./routes/apmcRoutes");
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.use("/api/vadi-score", vadiScoreRoutes);
 app.use("/api/service-ledger", serviceLedgerRoutes);
 app.use("/api/locations", locationRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/apmc", apmcRoutes);
 
 app.get("/", (req, res) => {
   res.send("Farmer App API Running 🌾");

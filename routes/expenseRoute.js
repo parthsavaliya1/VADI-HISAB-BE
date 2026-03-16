@@ -50,10 +50,11 @@ router.get(
   "/",
   auth,
   asyncHandler(async (req, res) => {
-    const { cropId, category, year, financialYear, page = 1, limit = 20 } = req.query;
+    const { cropId, category, year, financialYear, page = 1, limit = 20, expenseSource } = req.query;
     const where = { user_id: req.user.id };
     if (cropId) where.crop_id = cropId;
     if (category) where.category = category;
+    if (expenseSource) where.expense_source = expenseSource;
     const fy = financialYear || (year && String(year).includes("-") ? year : null);
     if (fy) {
       const range = parseFinancialYear(fy);

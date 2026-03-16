@@ -12,12 +12,12 @@ const sequelize = new Sequelize(dbUrl, {
   dialect: "postgres",
   logging: process.env.NODE_ENV === "development" ? console.log : false,
   // Add this for supabase
-  dialectOptions: {
-    ssl: {
-      require: true,
-      rejectUnauthorized: false,
-    },
-  },
+  // dialectOptions: {
+  //   ssl: {
+  //     require: true,
+  //     rejectUnauthorized: false,
+  //   },
+  // },
 
   define: {
     underscored: true,

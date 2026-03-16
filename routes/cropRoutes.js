@@ -93,8 +93,9 @@ router.get(
     const expenseMap = {};
     const incomeMap = {};
 
-    // Per-crop expense by category (for bhagma: farmer's direct = Seed + Fertilizer + Pesticide only)
-    const FARMER_DIRECT_CATEGORIES = ["Seed", "Fertilizer", "Pesticide"]; // biyaran, khatar, jantunasak
+    // Per-crop expense by category (for bhagma: farmer's direct = Seed, Fertilizer, Pesticide, Machinery/ tractor)
+    const FARMER_DIRECT_CATEGORIES = ["Seed", "Fertilizer", "Pesticide"];
+    const BHAGMA_CROP_EXPENSE_CATEGORIES = ["Seed", "Fertilizer", "Pesticide", "Machinery"]; // + tractor for bhagma crop expense
     let expenseByCropCategory = {}; // cropId -> { Seed: sum, Fertilizer: sum, ... }
     // Per-crop income by category: 25% labour share only on વેચણ (Crop Sale), not on Subsidy
     let incomeByCropCategory = {}; // cropId -> { "Crop Sale": sum, "Subsidy": sum, ... }
@@ -200,12 +201,14 @@ router.get(
       if (isBhagma && pct > 0) {
         // Farmer's direct expense = બિયારણ + ખતર + જંતુનાશક (Seed, Fertilizer, Pesticide)
         farmerDirectExpense = FARMER_DIRECT_CATEGORIES.reduce((s, cat) => s + (byCat[cat] || 0), 0);
+        // Crop expense for bhagma includes tractor (Machinery) so it is calculated and shown in crop summary
+        const bhagmaCropExpense = BHAGMA_CROP_EXPENSE_CATEGORIES.reduce((s, cat) => s + (byCat[cat] || 0), 0);
         // Labour share only on વેચણ (Crop Sale), not on સબસિડી (Subsidy) or other income
         const incomeByCat = incomeByCropCategory[id] || {};
         const cropSaleIncome = incomeByCat["Crop Sale"] || 0;
         labourShare = (pct / 100) * cropSaleIncome;
-        // Final expense = biyaran + khatar + jantunasak + labour share (25% of vechan only)
-        expense = farmerDirectExpense + labourShare;
+        // Final expense = biyaran + khatar + jantunasak + tractor (Machinery) + labour share
+        expense = bhagmaCropExpense + labourShare;
         profit = income - expense; // farmer's net (total income minus expense)
       } else {
         expense = expenseMap[id] ?? 0;
