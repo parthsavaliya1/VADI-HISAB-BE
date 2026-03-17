@@ -19,6 +19,23 @@ const DATA_GOV_API = "https://data.gov.in/api/datastore";
 const asyncHandler = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
 
+// data.gov.in can be slow; avoid frequent repeat calls from the app UI
+const APMC_TIMEOUT_MS = Number(process.env.APMC_TIMEOUT_MS || 45000);
+const APMC_CACHE_TTL_MS = Number(process.env.APMC_CACHE_TTL_MS || 5 * 60 * 1000); // 5 minutes
+const apmcCache = new Map(); // key=url -> { ts, payload }
+const getCached = (key) => {
+  const v = apmcCache.get(key);
+  if (!v) return null;
+  if (Date.now() - v.ts > APMC_CACHE_TTL_MS) {
+    apmcCache.delete(key);
+    return null;
+  }
+  return v.payload;
+};
+const setCached = (key, payload) => {
+  apmcCache.set(key, { ts: Date.now(), payload });
+};
+
 /**
  * GET /api/apmc/prices
  * Query: state, district, commodity, market, limit (default 50), offset (default 0)
@@ -48,14 +65,19 @@ router.get(
     if (market) params.append("filters[market]", market);
 
     const url = `${DATA_GOV_API}/resource.json?${params.toString()}`;
-    const response = await axios.get(url, { timeout: 15000 });
+    const cached = getCached(url);
+    if (cached) return res.json(cached);
+
+    const response = await axios.get(url, { timeout: APMC_TIMEOUT_MS });
     const data = response.data;
     const records = Array.isArray(data?.records) ? data.records : data?.data || [];
-    res.json({
+    const payload = {
       success: true,
       data: records,
       count: records.length,
-    });
+    };
+    setCached(url, payload);
+    res.json(payload);
   })
 );
 
