@@ -166,7 +166,7 @@ router.get(
   "/analytics",
   auth,
   asyncHandler(async (req, res) => {
-    const { financialYear, peerUserId } = req.query;
+    const { financialYear, peerUserId, cropName } = req.query;
     const fy = financialYear || getFinancialYearFromDate();
     const range = parseFinancialYear(fy);
     if (!range) {
@@ -175,32 +175,44 @@ router.get(
     const dateWhere = { date: { [Op.gte]: range.startDate, [Op.lte]: range.endDate } };
     const categories = ["Seed", "Fertilizer", "Pesticide", "Labour", "Machinery", "Irrigation", "Other"];
 
-    // Fetch expenses with crop_id; include Crop for bhagma check
+    // ── My side: optionally restrict to a single cropName for this FY ────────────
+    let myCropRows = [];
+    if (cropName) {
+      myCropRows = await Crop.findAll({
+        where: { user_id: req.user.id, year: fy, crop_name: cropName },
+        attributes: ["id", "land_type", "bhagma_percentage", "area"],
+        raw: true,
+      });
+    } else {
+      const allMyCropIdsForYear = await Crop.findAll({
+        where: { user_id: req.user.id, year: fy },
+        attributes: ["id", "land_type", "bhagma_percentage", "area"],
+        raw: true,
+      });
+      myCropRows = allMyCropIdsForYear;
+    }
+    const myCropIds = myCropRows.map((c) => c.id);
+
     const myExpenses = await Expense.findAll({
       attributes: ["crop_id", "category", "amount"],
-      where: { user_id: req.user.id, ...dateWhere },
+      where: {
+        user_id: req.user.id,
+        ...dateWhere,
+        ...(myCropIds.length > 0 ? { crop_id: { [Op.in]: myCropIds } } : {}),
+      },
       raw: true,
     });
-    const myCropIds = [...new Set(myExpenses.map((e) => e.crop_id).filter(Boolean))];
-    const myCropRows = myCropIds.length > 0
-      ? await Crop.findAll({
-          where: { id: { [Op.in]: myCropIds } },
-          attributes: ["id", "land_type", "bhagma_percentage"],
-          raw: true,
-        })
-      : [];
     const myCropMap = Object.fromEntries(myCropRows.map((c) => [c.id, c]));
     const myByCategory = computeByCategory(myExpenses, myCropMap, categories);
     const mySummary = categories
       .filter((cat) => (myByCategory[cat] || 0) > 0)
       .map((cat) => ({ _id: cat, total: Math.round(myByCategory[cat] * 100) / 100 }));
 
-    const myCrops = await Crop.findAll({
-      attributes: [[sequelize.fn("SUM", sequelize.col("area")), "totalArea"]],
-      where: { user_id: req.user.id, year: fy },
-      raw: true,
-    });
-    const myArea = parseFloat(myCrops[0]?.totalArea) || 0;
+    // When cropName is set: only area of that crop; otherwise full area for FY
+    let myArea = 0;
+    if (myCropRows.length > 0) {
+      myArea = myCropRows.reduce((sum, c) => sum + (parseFloat(c.area) || 0), 0);
+    }
     const myPerBighaByCategory = {};
     if (myArea > 0) {
       categories.forEach((cat) => {
@@ -244,28 +256,18 @@ router.get(
       }
 
       if (consentedIds.length > 0) {
-        const [allExpenses, cropAreas] = await Promise.all([
-          Expense.findAll({
-            attributes: ["user_id", "crop_id", "category", "amount"],
-            where: { user_id: { [Op.in]: consentedIds }, ...dateWhere },
-            raw: true,
-          }),
-          Crop.findAll({
-            attributes: ["user_id", [sequelize.fn("SUM", sequelize.col("area")), "totalArea"]],
-            where: { user_id: { [Op.in]: consentedIds }, year: fy },
-            group: ["user_id"],
-            raw: true,
-          }),
-        ]);
-        const cropIdsFromExpenses = [...new Set(allExpenses.map((e) => e.crop_id).filter(Boolean))];
-        const allCrops = cropIdsFromExpenses.length > 0
-          ? await Crop.findAll({
-              where: { id: { [Op.in]: cropIdsFromExpenses } },
-              attributes: ["id", "land_type", "bhagma_percentage"],
-              raw: true,
-            })
-          : [];
-        const cropMap = Object.fromEntries(allCrops.map((c) => [c.id, c]));
+        // Fetch all crops for consented users for this FY, optionally limited to cropName
+        const peerCrops = await Crop.findAll({
+          attributes: ["id", "user_id", "land_type", "bhagma_percentage", "area", "crop_name"],
+          where: {
+            user_id: { [Op.in]: consentedIds },
+            year: fy,
+            ...(cropName ? { crop_name: cropName } : {}),
+          },
+          raw: true,
+        });
+
+        const cropMap = Object.fromEntries(peerCrops.map((c) => [c.id, c]));
         const byUser = {};
         const expensesByUser = {};
         allExpenses.forEach((e) => {
@@ -273,11 +275,23 @@ router.get(
           if (!expensesByUser[uid]) expensesByUser[uid] = [];
           expensesByUser[uid].push(e);
         });
-        cropAreas.forEach((r) => {
-          const uid = r.user_id;
+        // Sum area per user based only on selected crops (or all crops when no cropName)
+        peerCrops.forEach((c) => {
+          const uid = c.user_id;
           if (!byUser[uid]) byUser[uid] = { expense: {}, area: 0 };
-          byUser[uid].area = parseFloat(r.totalArea) || 0;
+          byUser[uid].area += parseFloat(c.area) || 0;
         });
+
+        // Fetch expenses for those users; if cropName is set, only for those crop_ids
+        const allExpensesRaw = await Expense.findAll({
+          attributes: ["user_id", "crop_id", "category", "amount"],
+          where: { user_id: { [Op.in]: consentedIds }, ...dateWhere },
+          raw: true,
+        });
+        const allowedCropIds = new Set(Object.keys(cropMap));
+        const allExpenses = cropName
+          ? allExpensesRaw.filter((e) => e.crop_id && allowedCropIds.has(String(e.crop_id)))
+          : allExpensesRaw;
         Object.entries(expensesByUser).forEach(([uid, rows]) => {
           if (!byUser[uid]) byUser[uid] = { expense: {}, area: 0 };
           byUser[uid].expense = computeByCategory(rows, cropMap, categories);

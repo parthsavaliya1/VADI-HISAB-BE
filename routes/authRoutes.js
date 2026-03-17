@@ -9,8 +9,7 @@ const router = express.Router();
 
 // When OTP_CHANNEL=voice we generate OTP and send via 2Factor VOICE; we verify ourselves.
 const voiceOtpStore = new Map(); // sessionId -> { otp, phone, createdAt }
-const VOICE_OTP_TTL_MS = 10 * 60 * 1000; // 10 min
-
+const VOICE_OTP_TTL_MS = 5 * 60 * 1000; // 5 min
 function cleanupExpiredVoiceSessions() {
   const now = Date.now();
   for (const [sid, data] of voiceOtpStore.entries()) {
