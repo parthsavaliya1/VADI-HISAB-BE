@@ -193,15 +193,28 @@ router.get(
     }
     const myCropIds = myCropRows.map((c) => c.id);
 
-    const myExpenses = await Expense.findAll({
-      attributes: ["crop_id", "category", "amount"],
-      where: {
-        user_id: req.user.id,
-        ...dateWhere,
-        ...(myCropIds.length > 0 ? { crop_id: { [Op.in]: myCropIds } } : {}),
-      },
-      raw: true,
-    });
+    // After fetching myCropIds...
+const myExpenses = await Expense.findAll({
+  attributes: ["crop_id", "category", "amount"],
+  where: {
+    user_id: req.user.id,
+    [Op.or]: [
+      { ...dateWhere },
+      ...(myCropIds.length > 0 ? [{ crop_id: { [Op.in]: myCropIds } }] : []),
+    ],
+  },
+  raw: true,
+});
+
+    // const myExpenses = await Expense.findAll({
+    //   attributes: ["crop_id", "category", "amount"],
+    //   where: {
+    //     user_id: req.user.id,
+    //     ...dateWhere,
+    //     ...(myCropIds.length > 0 ? { crop_id: { [Op.in]: myCropIds } } : {}),
+    //   },
+    //   raw: true,
+    // });
     const myCropMap = Object.fromEntries(myCropRows.map((c) => [c.id, c]));
     const myByCategory = computeByCategory(myExpenses, myCropMap, categories);
     const mySummary = categories
@@ -269,12 +282,6 @@ router.get(
 
         const cropMap = Object.fromEntries(peerCrops.map((c) => [c.id, c]));
         const byUser = {};
-        const expensesByUser = {};
-        allExpenses.forEach((e) => {
-          const uid = e.user_id;
-          if (!expensesByUser[uid]) expensesByUser[uid] = [];
-          expensesByUser[uid].push(e);
-        });
         // Sum area per user based only on selected crops (or all crops when no cropName)
         peerCrops.forEach((c) => {
           const uid = c.user_id;
@@ -292,6 +299,12 @@ router.get(
         const allExpenses = cropName
           ? allExpensesRaw.filter((e) => e.crop_id && allowedCropIds.has(String(e.crop_id)))
           : allExpensesRaw;
+        const expensesByUser = {};
+        allExpenses.forEach((e) => {
+          const uid = e.user_id;
+          if (!expensesByUser[uid]) expensesByUser[uid] = [];
+          expensesByUser[uid].push(e);
+        });
         Object.entries(expensesByUser).forEach(([uid, rows]) => {
           if (!byUser[uid]) byUser[uid] = { expense: {}, area: 0 };
           byUser[uid].expense = computeByCategory(rows, cropMap, categories);
