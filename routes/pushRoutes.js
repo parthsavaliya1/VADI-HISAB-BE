@@ -1,7 +1,7 @@
 const express = require("express");
 const axios = require("axios");
 const { Op } = require("sequelize");
-const { PushToken, Notification } = require("../models");
+const { PushToken, Notification, User } = require("../models");
 const auth = require("../middleware/authMiddleware");
 
 const router = express.Router();
@@ -79,12 +79,17 @@ router.post(
       });
     }
 
-    // if (sendToAll && req.user.role !== "admin") {
-    //   return res.status(403).json({
-    //     success: false,
-    //     message: "Only admin users can send broadcast notifications.",
-    //   });
-    // }
+    // Token currently guarantees user id; fetch role from DB for authorization.
+    if (sendToAll) {
+      const currentUser = await User.findByPk(req.user.id, { attributes: ["id", "role"] });
+      console.log("Test",currentUser)
+      if (!currentUser || currentUser.role !== "admin") {
+        return res.status(403).json({
+          success: false,
+          message: "Only admin users can send broadcast notifications.",
+        });
+      }
+    }
 
     let targetUserIds;
     if (sendToAll) {
