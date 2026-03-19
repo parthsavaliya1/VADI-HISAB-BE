@@ -8,6 +8,14 @@ const { getFinancialYearFromDate, parseFinancialYear, sortFinancialYearsDesc } =
 const asyncHandler = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
 
+const getBhagmaShareRatio = (pct) => {
+  const n = Number(pct);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  // "ત્રીજા ભાગે" is stored as 33 in DB, but business logic expects exact one-third.
+  if (n === 33) return 1 / 3;
+  return n / 100;
+};
+
 router.post(
   "/",
   auth,
@@ -26,6 +34,20 @@ router.post(
 
     const defaultSowingDate = new Date().toISOString().slice(0, 10);
     const financialYear = year && typeof year === "string" ? year : (year ? `${year}-${String((Number(year) + 1) % 100).padStart(2, "0")}` : getFinancialYearFromDate());
+    const parsedBhagmaPct =
+      bhagmaPercentage != null && bhagmaPercentage !== ""
+        ? Math.round(Number(bhagmaPercentage))
+        : null;
+
+    if (landType === "bhagma") {
+      if (!Number.isFinite(parsedBhagmaPct) || parsedBhagmaPct <= 0 || parsedBhagmaPct > 100) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid bhagmaPercentage. Expected 1-100.",
+        });
+      }
+    }
+
     const crop = await Crop.create({
       user_id: req.user.id,
       season,
@@ -38,7 +60,7 @@ router.post(
       area: Number(area),
       area_unit: areaUnit ?? "Bigha",
       land_type: landType ?? null,
-      bhagma_percentage: bhagmaPercentage != null ? Number(bhagmaPercentage) : null,
+      bhagma_percentage: parsedBhagmaPct,
       bhagma_expense_pct_of_income: bhagmaExpensePctOfIncome != null && bhagmaExpensePctOfIncome !== "" ? Number(bhagmaExpensePctOfIncome) : null,
       sowing_date: sowingDate ?? defaultSowingDate,
       harvest_date: harvestDate ?? null,
@@ -191,14 +213,14 @@ router.get(
       const id = crop.id;
       const income = incomeMap[id] ?? 0;
       const isBhagma = crop.land_type === "bhagma" && crop.bhagma_percentage != null;
-      const pct = isBhagma ? Number(crop.bhagma_percentage) : 0;
+      const shareRatio = isBhagma ? getBhagmaShareRatio(crop.bhagma_percentage) : 0;
       const byCat = expenseByCropCategory[id] || {};
       let expense;
       let profit;
       let labourShare = null;
       let farmerDirectExpense = null;
 
-      if (isBhagma && pct > 0) {
+      if (isBhagma && shareRatio > 0) {
         // Farmer's direct expense = બિયારણ + ખતર + જંતુનાશક (Seed, Fertilizer, Pesticide)
         farmerDirectExpense = FARMER_DIRECT_CATEGORIES.reduce((s, cat) => s + (byCat[cat] || 0), 0);
         // Crop expense for bhagma includes tractor (Machinery) so it is calculated and shown in crop summary
@@ -206,7 +228,7 @@ router.get(
         // Labour share only on વેચણ (Crop Sale), not on સબસિડી (Subsidy) or other income
         const incomeByCat = incomeByCropCategory[id] || {};
         const cropSaleIncome = incomeByCat["Crop Sale"] || 0;
-        labourShare = (pct / 100) * cropSaleIncome;
+        labourShare = shareRatio * cropSaleIncome;
         // Final expense = biyaran + khatar + jantunasak + tractor (Machinery) + labour share
         expense = bhagmaCropExpense + labourShare;
         profit = income - expense; // farmer's net (total income minus expense)
