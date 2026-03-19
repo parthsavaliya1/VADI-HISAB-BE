@@ -13,6 +13,7 @@ const serviceLedgerRoutes = require("./routes/serviceLedgerRoutes");
 const locationRoutes = require("./routes/locationRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const apmcRoutes = require("./routes/apmcRoutes");
+const pushRoutes = require("./routes/pushRoutes");
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use("/api/service-ledger", serviceLedgerRoutes);
 app.use("/api/locations", locationRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/apmc", apmcRoutes);
+app.use("/api/push", pushRoutes);
 
 app.get("/", (req, res) => {
   res.send("Farmer App API Running 🌾");

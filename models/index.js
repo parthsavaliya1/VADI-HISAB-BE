@@ -298,6 +298,30 @@ const Notification = sequelize.define(
 User.hasMany(Notification, { foreignKey: "user_id" });
 Notification.belongsTo(User, { foreignKey: "user_id" });
 
+// ─── PushToken ────────────────────────────────────────────────────────────────
+const PushToken = sequelize.define(
+  "PushToken",
+  {
+    id: {
+      type: Sequelize.UUID,
+      defaultValue: Sequelize.UUIDV4,
+      primaryKey: true,
+    },
+    user_id: { type: Sequelize.UUID, allowNull: false, references: { model: "users", key: "id" } },
+    token: { type: Sequelize.STRING(255), allowNull: false },
+    platform: { type: Sequelize.STRING(20), allowNull: false, defaultValue: "unknown" },
+    is_active: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: true },
+    last_seen_at: { type: Sequelize.DATE, allowNull: true, defaultValue: null },
+  },
+  {
+    tableName: "push_tokens",
+    indexes: [{ unique: true, fields: ["user_id", "token"] }],
+  }
+);
+
+User.hasMany(PushToken, { foreignKey: "user_id" });
+PushToken.belongsTo(User, { foreignKey: "user_id" });
+
 // ─── Map Sequelize row to API shape (camelCase + _id) ─────────────────────────
 function mapRow(row) {
   if (!row) return null;
@@ -410,6 +434,7 @@ module.exports = {
   Expense,
   ServiceLedger,
   Notification,
+  PushToken,
   Location,
   toApiShape,
   mapRow,
