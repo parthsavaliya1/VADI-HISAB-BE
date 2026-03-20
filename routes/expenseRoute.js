@@ -32,7 +32,7 @@ router.post(
   "/",
   auth,
   asyncHandler(async (req, res) => {
-    const { cropId, category, date, notes, seed, fertilizer, pesticide, labourDaily, labourContract, machinery, irrigation, other } = req.body;
+    const { cropId, category, date } = req.body;
     if (!category) {
       return res.status(400).json({ success: false, message: "category is required." });
     }
@@ -41,7 +41,31 @@ router.post(
     if (!VALID_CATEGORIES.includes(category)) {
       return res.status(400).json({ success: false, message: `category must be one of: ${VALID_CATEGORIES.join(", ")}` });
     }
-    const expense = await Expense.create(bodyToExpense(req.body, req.user.id));
+    const parsedDate = date ? new Date(date) : new Date();
+    let financialYearToSet = null;
+
+    // Keep fiscal year aligned with crop.year (like crops table),
+    // so crop-linked expenses show up in the correct FY even if `date` is "today".
+    if (cropId) {
+      const crop = await Crop.findOne({
+        where: { user_id: req.user.id, id: cropId },
+        attributes: ["year"],
+        raw: true,
+      });
+      if (!crop?.year) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid cropId (no crop year found).",
+        });
+      }
+      financialYearToSet = crop.year;
+    } else {
+      financialYearToSet = getFinancialYearFromDate(parsedDate);
+    }
+
+    const payload = bodyToExpense(req.body, req.user.id);
+    payload.year = financialYearToSet;
+    const expense = await Expense.create(payload);
     res.status(201).json({ success: true, data: mapExpense(expense) });
   })
 );
@@ -55,27 +79,16 @@ router.get(
     if (cropId) where.crop_id = cropId;
     if (category) where.category = category;
     if (expenseSource) where.expense_source = expenseSource;
-    const fy = financialYear || (year && String(year).includes("-") ? year : null);
+    const fy = financialYear || (year && String(year).includes("-") ? String(year) : null);
     if (fy) {
-      const range = parseFinancialYear(fy);
-      const cropIdsForYear = await Crop.findAll({
-        where: { user_id: req.user.id, year: fy },
-        attributes: ["id"],
-        raw: true,
-      }).then((rows) => rows.map((r) => r.id));
-      if (range) {
-        if (cropIdsForYear.length > 0) {
-          // Include expenses that are either: (1) date in FY range, or (2) linked to a crop of this year
-          where[Op.or] = [
-            { date: { [Op.gte]: range.startDate, [Op.lte]: range.endDate } },
-            { crop_id: { [Op.in]: cropIdsForYear } },
-          ];
-        } else {
-          where.date = { [Op.gte]: range.startDate, [Op.lte]: range.endDate };
-        }
-      }
+      // FY is stored directly on expenses.year (financialYear like "2025-26").
+      where.year = fy;
     } else if (year) {
-      where.year = Number(year);
+      // Backward compatibility for numeric `year` (calendar year).
+      const yNum = Number(year);
+      if (Number.isFinite(yNum)) {
+        where.date = { [Op.gte]: `${yNum}-01-01`, [Op.lte]: `${yNum}-12-31` };
+      }
     }
 
     const { count, rows } = await Expense.findAndCountAll({
@@ -106,12 +119,14 @@ router.get(
   asyncHandler(async (req, res) => {
     const { year, financialYear, cropId } = req.query;
     const where = { user_id: req.user.id };
-    const fy = financialYear || (year && String(year).includes("-") ? year : null);
+    const fy = financialYear || (year && String(year).includes("-") ? String(year) : null);
     if (fy) {
-      const range = parseFinancialYear(fy);
-      if (range) where.date = { [Op.gte]: range.startDate, [Op.lte]: range.endDate };
+      where.year = fy;
     } else if (year) {
-      where.year = Number(year);
+      const yNum = Number(year);
+      if (Number.isFinite(yNum)) {
+        where.date = { [Op.gte]: `${yNum}-01-01`, [Op.lte]: `${yNum}-12-31` };
+      }
     }
     if (cropId) where.crop_id = cropId;
 
@@ -172,7 +187,9 @@ router.get(
     if (!range) {
       return res.status(400).json({ success: false, message: "Invalid financialYear." });
     }
-    const dateWhere = { date: { [Op.gte]: range.startDate, [Op.lte]: range.endDate } };
+    // FY is stored directly on expenses.year (financialYear like "2025-26").
+    // Using `year` avoids mis-bucketing when `date` falls in a different FY range.
+    const dateWhere = { year: fy };
     const categories = ["Seed", "Fertilizer", "Pesticide", "Labour", "Machinery", "Irrigation", "Other"];
 
     // ── My side: optionally restrict to a single cropName for this FY ────────────
@@ -194,17 +211,11 @@ router.get(
     const myCropIds = myCropRows.map((c) => c.id);
 
     // After fetching myCropIds...
-const myExpenses = await Expense.findAll({
-  attributes: ["crop_id", "category", "amount"],
-  where: {
-    user_id: req.user.id,
-    [Op.or]: [
-      { ...dateWhere },
-      ...(myCropIds.length > 0 ? [{ crop_id: { [Op.in]: myCropIds } }] : []),
-    ],
-  },
-  raw: true,
-});
+    const myExpenses = await Expense.findAll({
+      attributes: ["crop_id", "category", "amount"],
+      where: { user_id: req.user.id, ...dateWhere },
+      raw: true,
+    });
 
     // const myExpenses = await Expense.findAll({
     //   attributes: ["crop_id", "category", "amount"],
@@ -374,6 +385,18 @@ router.put(
     const expense = await Expense.findOne({ where: { id: req.params.id, user_id: req.user.id } });
     if (!expense) return res.status(404).json({ success: false, message: "Expense not found." });
     const updates = bodyToExpense(req.body, req.user.id);
+
+    // Keep year aligned with crop.year (or FY from date for general expenses).
+    if (updates.crop_id) {
+      const crop = await Crop.findOne({
+        where: { user_id: req.user.id, id: updates.crop_id },
+        attributes: ["year"],
+        raw: true,
+      });
+      if (crop?.year) updates.year = crop.year;
+    } else {
+      updates.year = getFinancialYearFromDate(new Date(updates.date || new Date()));
+    }
     await expense.update(updates);
     res.json({ success: true, data: mapExpense(expense) });
   })

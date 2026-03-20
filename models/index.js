@@ -1,4 +1,5 @@
 const { sequelize, Sequelize } = require("../config/database");
+const { getFinancialYearFromDate } = require("../utils/financialYear");
 
 // ─── Helper: ensure API responses include _id for compatibility with existing app ──
 function toApiShape(row) {
@@ -117,7 +118,7 @@ const Income = sequelize.define(
     crop_id: { type: Sequelize.UUID, allowNull: true, defaultValue: null },
     category: { type: Sequelize.STRING(30), allowNull: false },
     amount: { type: Sequelize.DECIMAL(14, 2), defaultValue: 0 },
-    year: { type: Sequelize.INTEGER },
+    year: { type: Sequelize.STRING(10) },
     date: { type: Sequelize.DATEONLY, defaultValue: Sequelize.NOW },
     notes: { type: Sequelize.STRING(500), defaultValue: "" },
     crop_sale: { type: Sequelize.JSONB, defaultValue: null },
@@ -153,7 +154,12 @@ function computeIncomeAmount(income) {
     default:
       income.amount = 0;
   }
-  income.year = new Date(income.date || new Date()).getFullYear();
+  // Keep fiscal year aligned with crops (financialYear like "2025-26").
+  // If route/DB hasn't set `year`, derive from the entry date.
+  const computedFY = getFinancialYearFromDate(new Date(income.date || new Date()));
+  if (!income.year || typeof income.year !== "string" || !String(income.year).includes("-")) {
+    income.year = computedFY;
+  }
 }
 
 Income.beforeCreate(computeIncomeAmount);
@@ -179,7 +185,7 @@ const Expense = sequelize.define(
     category: { type: Sequelize.STRING(30), allowNull: false },
     expense_source: { type: Sequelize.STRING(30), allowNull: true, defaultValue: null },
     amount: { type: Sequelize.DECIMAL(14, 2), defaultValue: 0 },
-    year: { type: Sequelize.INTEGER },
+    year: { type: Sequelize.STRING(10) },
     date: { type: Sequelize.DATEONLY, defaultValue: Sequelize.NOW },
     notes: { type: Sequelize.STRING(500), defaultValue: "" },
     seed: { type: Sequelize.JSONB, defaultValue: null },
@@ -234,7 +240,12 @@ function computeExpenseAmount(expense) {
     default:
       expense.amount = 0;
   }
-  expense.year = new Date(expense.date || new Date()).getFullYear();
+  // Keep fiscal year aligned with crops (financialYear like "2025-26").
+  // If route/DB hasn't set `year`, derive from the entry date.
+  const computedFY = getFinancialYearFromDate(new Date(expense.date || new Date()));
+  if (!expense.year || typeof expense.year !== "string" || !String(expense.year).includes("-")) {
+    expense.year = computedFY;
+  }
 }
 
 Expense.beforeCreate(computeExpenseAmount);

@@ -48,7 +48,33 @@ async function notifyPendingRentalIncome(income, providerUserId) {
 
 router.post("/", auth, async (req, res) => {
   try {
-    const income = await Income.create(bodyToIncome(req.body, req.user.id));
+    const parsedDate = req.body.date ? new Date(req.body.date) : new Date();
+
+    let financialYearToSet = null;
+    const cropId = req.body.cropId ?? null;
+
+    // Align income FY with crop.year (like crops table).
+    if (cropId) {
+      const crop = await Crop.findOne({
+        where: { user_id: req.user.id, id: cropId },
+        attributes: ["year"],
+        raw: true,
+      });
+      if (!crop?.year) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid cropId (no crop year found).",
+        });
+      }
+      financialYearToSet = crop.year;
+    } else {
+      financialYearToSet = getFinancialYearFromDate(parsedDate);
+    }
+
+    const payload = bodyToIncome(req.body, req.user.id);
+    payload.year = financialYearToSet;
+
+    const income = await Income.create(payload);
     await notifyPendingRentalIncome(income, req.user.id);
     res.status(201).json({ success: true, data: mapIncome(income) });
   } catch (err) {
@@ -61,24 +87,14 @@ router.get("/", auth, asyncHandler(async (req, res) => {
   const where = { user_id: req.user.id };
   const fy = financialYear || (year && String(year).includes("-") ? year : null);
   if (fy) {
-    const range = parseFinancialYear(fy);
-    const cropIdsForYear = await Crop.findAll({
-      where: { user_id: req.user.id, year: fy },
-      attributes: ["id"],
-      raw: true,
-    }).then((rows) => rows.map((r) => r.id));
-    if (range) {
-      if (cropIdsForYear.length > 0) {
-        where[Op.or] = [
-          { date: { [Op.gte]: range.startDate, [Op.lte]: range.endDate } },
-          { crop_id: { [Op.in]: cropIdsForYear } },
-        ];
-      } else {
-        where.date = { [Op.gte]: range.startDate, [Op.lte]: range.endDate };
-      }
-    }
+    // FY stored directly on incomes.year (financialYear like "2025-26").
+    where.year = fy;
   } else if (year) {
-    where.year = Number(year);
+    // Backward compatibility for numeric `year` (calendar year).
+    const yNum = Number(year);
+    if (Number.isFinite(yNum)) {
+      where.date = { [Op.gte]: `${yNum}-01-01`, [Op.lte]: `${yNum}-12-31` };
+    }
   }
   if (category) where.category = category;
   if (cropId) where.crop_id = cropId;
@@ -110,10 +126,12 @@ router.get("/summary", auth, async (req, res) => {
     const where = { user_id: req.user.id };
     const fy = financialYear || (year && String(year).includes("-") ? year : null);
     if (fy) {
-      const range = parseFinancialYear(fy);
-      if (range) where.date = { [Op.gte]: range.startDate, [Op.lte]: range.endDate };
+      where.year = fy;
     } else if (year) {
-      where.year = Number(year);
+      const yNum = Number(year);
+      if (Number.isFinite(yNum)) {
+        where.date = { [Op.gte]: `${yNum}-01-01`, [Op.lte]: `${yNum}-12-31` };
+      }
     }
 
     const rows = await Income.findAll({
@@ -142,8 +160,12 @@ router.get("/analytics", auth, async (req, res) => {
     }
     const { year, financialYear, district } = req.query;
     const fy = financialYear || (year && String(year).includes("-") ? year : null);
-    const range = fy ? parseFinancialYear(fy) : null;
-    const dateWhere = range ? { date: { [Op.gte]: range.startDate, [Op.lte]: range.endDate } } : { year: Number(year) || new Date().getFullYear() };
+    // FY is stored directly on incomes.year (financialYear like "2025-26").
+    // If FY isn't passed, fall back to calendar-year date filtering.
+    const yNum = Number(year) || new Date().getFullYear();
+    const dateWhere = fy
+      ? { year: fy }
+      : { date: { [Op.gte]: `${yNum}-01-01`, [Op.lte]: `${yNum}-12-31` } };
 
     const mySum = await Income.findOne({
       attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total"]],
@@ -193,7 +215,7 @@ router.get("/analytics", auth, async (req, res) => {
 
     res.json({
       success: true,
-      year: range ? fy : (Number(year) || new Date().getFullYear()),
+      year: fy || yNum,
       financialYear: fy || null,
       myTotal,
       avgTotal,
@@ -232,6 +254,19 @@ router.put("/:id", auth, async (req, res) => {
     if (subsidy !== undefined) income.subsidy = subsidy;
     if (rentalIncome !== undefined) income.rental_income = rentalIncome;
     if (otherIncome !== undefined) income.other_income = otherIncome;
+
+    // Keep FY aligned with crop.year (for crop-linked incomes) or date FY (for general incomes).
+    const parsed = date !== undefined ? new Date(date) : (income.date ? new Date(income.date) : new Date());
+    if (income.crop_id) {
+      const crop = await Crop.findOne({
+        where: { user_id: req.user.id, id: income.crop_id },
+        attributes: ["year"],
+        raw: true,
+      });
+      if (crop?.year) income.year = crop.year;
+    } else {
+      income.year = getFinancialYearFromDate(parsed);
+    }
     await income.save();
     const isPendingRentalIncome =
       income.category === "Rental Income" && income.rental_income?.paymentStatus === "Pending";
