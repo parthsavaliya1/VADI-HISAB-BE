@@ -1,12 +1,10 @@
 const express = require("express");
-const axios = require("axios");
-const { Op } = require("sequelize");
-const { PushToken, Notification, User } = require("../models");
+const { PushToken, User } = require("../models");
 const auth = require("../middleware/authMiddleware");
+const { sendExpoPushToUserIds } = require("../utils/expoPushSend");
 
 const router = express.Router();
 
-const EXPO_PUSH_API_URL = "https://exp.host/--/api/v2/push/send";
 const EXPO_TOKEN_REGEX = /^(ExponentPushToken|ExpoPushToken)\[[^\]]+\]$/;
 
 const asyncHandler = (fn) => (req, res, next) =>
@@ -110,65 +108,26 @@ router.post(
       });
     }
 
-    const activeTokens = await PushToken.findAll({
-      where: {
-        user_id: { [Op.in]: targetUserIds },
-        is_active: true,
-      },
+    const pushResult = await sendExpoPushToUserIds(targetUserIds, {
+      title,
+      body,
+      data: data || {},
+      sound,
+      saveInApp,
     });
 
-    if (!activeTokens.length) {
+    if (!pushResult.ok) {
       return res.status(404).json({
         success: false,
         message: "No active push tokens found for target users.",
       });
     }
 
-    const messages = activeTokens.map((row) => ({
-      to: row.token,
-      sound,
-      title,
-      body,
-      priority: "high",
-      channelId: "default",
-      data: data || {},
-    }));
-
-    const chunks = [];
-    for (let i = 0; i < messages.length; i += 100) {
-      chunks.push(messages.slice(i, i + 100));
-    }
-
-    const tickets = [];
-    for (const chunk of chunks) {
-      const response = await axios.post(
-        EXPO_PUSH_API_URL,
-        chunk,
-        { headers: { "Content-Type": "application/json" }, timeout: 15000 }
-      );
-      if (Array.isArray(response.data?.data)) tickets.push(...response.data.data);
-    }
-
-    if (saveInApp) {
-      const uniqueUsers = [...new Set(targetUserIds)];
-      await Promise.all(
-        uniqueUsers.map((userId) =>
-          Notification.create({
-            user_id: userId,
-            type: "Push",
-            title,
-            message: body,
-            meta: data || {},
-          })
-        )
-      );
-    }
-
     res.json({
       success: true,
-      sentToTokens: activeTokens.length,
+      sentToTokens: pushResult.sentToTokens,
       targetUsers: [...new Set(targetUserIds)].length,
-      tickets,
+      tickets: pushResult.tickets,
     });
   })
 );

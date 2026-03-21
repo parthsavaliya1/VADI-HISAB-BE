@@ -7,6 +7,7 @@ const { parseFinancialYear, getFinancialYearFromDate } = require("../utils/finan
 const {
   createPendingTractorChargeNotification,
   findUserByPhone,
+  sendPendingTractorReminderPush,
 } = require("../utils/notificationHelpers");
 
 const asyncHandler = (fn) => (req, res, next) =>
@@ -223,6 +224,29 @@ router.get("/analytics", auth, async (req, res) => {
       topCropByIncome,
       advice,
       sampleSize: totalsArr.length,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.post("/:id/send-pending-reminder", auth, async (req, res) => {
+  try {
+    const income = await Income.findOne({
+      where: { id: req.params.id, user_id: req.user.id },
+    });
+    if (!income) {
+      return res.status(404).json({ success: false, message: "Income entry not found." });
+    }
+    const result = await sendPendingTractorReminderPush(income, req.user.id);
+    if (!result.success) {
+      return res.status(400).json({ success: false, message: result.message });
+    }
+    res.json({
+      success: true,
+      sentToTokens: result.sentToTokens ?? 0,
+      inAppCreated: result.inAppCreated ?? false,
+      message: result.message,
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
