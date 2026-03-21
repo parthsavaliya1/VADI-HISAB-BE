@@ -1,4 +1,5 @@
 require("dotenv").config();
+const path = require("path");
 const express = require("express");
 const cors = require("cors");
 const connectDB = require("./config/db");
@@ -19,6 +20,8 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+// Public files for push notification rich images (must be HTTPS + reachable from phones in production)
+app.use(express.static(path.join(__dirname, "public")));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
