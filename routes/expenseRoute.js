@@ -79,24 +79,28 @@ router.get(
     if (cropId) where.crop_id = cropId;
     if (category) where.category = category;
     if (expenseSource) where.expense_source = expenseSource;
-    const fy = financialYear || (year && String(year).includes("-") ? String(year) : null);
+    const yearStr = year != null && year !== "" ? String(year).trim() : "";
+    const fy = financialYear || (yearStr.includes("-") ? yearStr : null);
     if (fy) {
       // FY is stored directly on expenses.year (financialYear like "2025-26").
       where.year = fy;
-    } else if (year) {
-      // Backward compatibility for numeric `year` (calendar year).
-      const yNum = Number(year);
-      if (Number.isFinite(yNum)) {
-        where.date = { [Op.gte]: `${yNum}-01-01`, [Op.lte]: `${yNum}-12-31` };
+    } else if (yearStr) {
+      // Backward compatibility for numeric `year` (calendar year). Reject "" → Number("") === 0.
+      const yNum = Number(yearStr);
+      if (Number.isFinite(yNum) && yNum >= 1 && yNum <= 9999) {
+        where.date = { [Op.between]: [`${yNum}-01-01`, `${yNum}-12-31`] };
       }
     }
 
+    // distinct + col: avoid Postgres "ambiguous id" / broken COUNT subquery when joining crops.
     const { count, rows } = await Expense.findAndCountAll({
       where,
       include: [{ model: Crop, as: "Crop", attributes: ["id", "crop_name"], required: false }],
       order: [["date", "DESC"]],
       offset: (Number(page) - 1) * Number(limit),
       limit: Number(limit),
+      distinct: true,
+      col: "id",
     });
     const data = rows.map((row) => {
       const mapped = mapExpense(row);
@@ -119,13 +123,14 @@ router.get(
   asyncHandler(async (req, res) => {
     const { year, financialYear, cropId } = req.query;
     const where = { user_id: req.user.id };
-    const fy = financialYear || (year && String(year).includes("-") ? String(year) : null);
+    const yearStr = year != null && year !== "" ? String(year).trim() : "";
+    const fy = financialYear || (yearStr.includes("-") ? yearStr : null);
     if (fy) {
       where.year = fy;
-    } else if (year) {
-      const yNum = Number(year);
-      if (Number.isFinite(yNum)) {
-        where.date = { [Op.gte]: `${yNum}-01-01`, [Op.lte]: `${yNum}-12-31` };
+    } else if (yearStr) {
+      const yNum = Number(yearStr);
+      if (Number.isFinite(yNum) && yNum >= 1 && yNum <= 9999) {
+        where.date = { [Op.between]: [`${yNum}-01-01`, `${yNum}-12-31`] };
       }
     }
     if (cropId) where.crop_id = cropId;
