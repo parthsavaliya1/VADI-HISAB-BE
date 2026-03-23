@@ -42,6 +42,8 @@ router.post(
       return res.status(400).json({ success: false, message: `category must be one of: ${VALID_CATEGORIES.join(", ")}` });
     }
     const parsedDate = date ? new Date(date) : new Date();
+    const financialYearOverride =
+      typeof req.body.financialYear === "string" ? req.body.financialYear.trim() : null;
     let financialYearToSet = null;
 
     // Keep fiscal year aligned with crop.year (like crops table),
@@ -60,7 +62,13 @@ router.post(
       }
       financialYearToSet = crop.year;
     } else {
-      financialYearToSet = getFinancialYearFromDate(parsedDate);
+      // For non-crop expenses (including bhagyaUpad + tractorExpense),
+      // allow FY override from the selected year tab.
+      if (financialYearOverride && parseFinancialYear(financialYearOverride)) {
+        financialYearToSet = financialYearOverride;
+      } else {
+        financialYearToSet = getFinancialYearFromDate(parsedDate);
+      }
     }
 
     const payload = bodyToExpense(req.body, req.user.id);
@@ -390,6 +398,8 @@ router.put(
     const expense = await Expense.findOne({ where: { id: req.params.id, user_id: req.user.id } });
     if (!expense) return res.status(404).json({ success: false, message: "Expense not found." });
     const updates = bodyToExpense(req.body, req.user.id);
+    const financialYearOverride =
+      typeof req.body.financialYear === "string" ? req.body.financialYear.trim() : null;
 
     // Keep year aligned with crop.year (or FY from date for general expenses).
     if (updates.crop_id) {
@@ -400,7 +410,11 @@ router.put(
       });
       if (crop?.year) updates.year = crop.year;
     } else {
-      updates.year = getFinancialYearFromDate(new Date(updates.date || new Date()));
+      if (financialYearOverride && parseFinancialYear(financialYearOverride)) {
+        updates.year = financialYearOverride;
+      } else {
+        updates.year = getFinancialYearFromDate(new Date(updates.date || new Date()));
+      }
     }
     await expense.update(updates);
     res.json({ success: true, data: mapExpense(expense) });

@@ -50,6 +50,8 @@ async function notifyPendingRentalIncome(income, providerUserId) {
 router.post("/", auth, async (req, res) => {
   try {
     const parsedDate = req.body.date ? new Date(req.body.date) : new Date();
+    const financialYearOverride =
+      typeof req.body.financialYear === "string" ? req.body.financialYear.trim() : null;
 
     let financialYearToSet = null;
     const cropId = req.body.cropId ?? null;
@@ -69,7 +71,13 @@ router.post("/", auth, async (req, res) => {
       }
       financialYearToSet = crop.year;
     } else {
-      financialYearToSet = getFinancialYearFromDate(parsedDate);
+      // For "non crop" incomes we allow the frontend to override the FY
+      // using the selected year tab (financialYear).
+      if (financialYearOverride && parseFinancialYear(financialYearOverride)) {
+        financialYearToSet = financialYearOverride;
+      } else {
+        financialYearToSet = getFinancialYearFromDate(parsedDate);
+      }
     }
 
     const payload = bodyToIncome(req.body, req.user.id);
@@ -270,6 +278,8 @@ router.put("/:id", auth, async (req, res) => {
     const wasPendingRentalIncome =
       income.category === "Rental Income" && income.rental_income?.paymentStatus === "Pending";
     const { cropId, category, date, notes, cropSale, subsidy, rentalIncome, otherIncome } = req.body;
+    const financialYearOverride =
+      typeof req.body.financialYear === "string" ? req.body.financialYear.trim() : null;
     if (category !== undefined) income.category = category;
     if (date !== undefined) income.date = date;
     if (notes !== undefined) income.notes = notes;
@@ -289,7 +299,11 @@ router.put("/:id", auth, async (req, res) => {
       });
       if (crop?.year) income.year = crop.year;
     } else {
-      income.year = getFinancialYearFromDate(parsed);
+      if (financialYearOverride && parseFinancialYear(financialYearOverride)) {
+        income.year = financialYearOverride;
+      } else {
+        income.year = getFinancialYearFromDate(parsed);
+      }
     }
     await income.save();
     const isPendingRentalIncome =
