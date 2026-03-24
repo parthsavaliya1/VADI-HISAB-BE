@@ -3,7 +3,7 @@ const router = express.Router();
 const { Crop, Expense, Income, FarmerProfile, mapCrop, sequelize } = require("../models");
 const auth = require("../middleware/authMiddleware");
 const { Op } = require("sequelize");
-const { getFinancialYearFromDate, sortFinancialYearsDesc } = require("../utils/financialYear");
+const { getFinancialYearFromDate, parseFinancialYear, sortFinancialYearsDesc } = require("../utils/financialYear");
 
 const asyncHandler = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
@@ -117,9 +117,23 @@ router.get(
       ? financialYear
       : (Number(financialYear) ? `${financialYear}-${String((Number(financialYear) + 1) % 100).padStart(2, "0")}` : getFinancialYearFromDate());
 
-    // Extra income/expense (no crop): use expenses.year / incomes.year = FY (same as analytics),
-    // not calendar date range — so સામાન્ય ખર્ચ with correct FY is never missed.
-    const fyWhere = { user_id: userId, year };
+    // Extra income/expense (no crop): match FY by `year` column, OR legacy rows with year null + date in FY.
+    const range = parseFinancialYear(year);
+    const fyOrLegacyDate = {
+      [Op.or]: [
+        { year },
+        ...(range != null
+          ? [
+              {
+                [Op.and]: [
+                  { [Op.or]: [{ year: null }, { year: "" }] },
+                  { date: { [Op.gte]: range.startDate, [Op.lte]: range.endDate } },
+                ],
+              },
+            ]
+          : []),
+      ],
+    };
 
     const crops = await Crop.findAll({
       where: { user_id: userId, year },
@@ -195,28 +209,52 @@ router.get(
     const [extraIncomeRow, tractorIncomeRow, extraExpenseRow, bhagyaUpadRow] = await Promise.all([
       Income.findOne({
         attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total"]],
-        where: { ...fyWhere, crop_id: null },
+        where: { user_id: userId, crop_id: null, ...fyOrLegacyDate },
         raw: true,
       }),
       Income.findOne({
         attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total"]],
-        where: { ...fyWhere, crop_id: null, category: "Rental Income" },
+        where: {
+          user_id: userId,
+          crop_id: null,
+          category: "Rental Income",
+          ...fyOrLegacyDate,
+        },
         raw: true,
       }),
+      // અન્ય ખર્ચ: પાક વગર. category≠Labour અથવા સામાન્ય/ટ્રેક્ટર ખર્ચ (મજૂરી સામાન્ય પણ ગણાય). ભાગ્યા ઉપાડ = Labour+ભાગ્યા સોર્સ — નીચે નથી.
       Expense.findOne({
         attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total"]],
-        where: { ...fyWhere, crop_id: null, category: { [Op.ne]: "Labour" } },
+        where: {
+          user_id: userId,
+          crop_id: null,
+          [Op.and]: [
+            fyOrLegacyDate,
+            {
+              [Op.or]: [
+                { category: { [Op.ne]: "Labour" } },
+                { expense_source: "generalExpense" },
+                { expense_source: "tractorExpense" },
+              ],
+            },
+          ],
+        },
         raw: true,
       }),
       Expense.findOne({
         attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total"]],
         where: {
-          ...fyWhere,
+          user_id: userId,
           crop_id: null,
           category: "Labour",
-          [Op.or]: [
-            { expense_source: "bhagyaUpad" },
-            { labour_contract: { [Op.contains]: { sourceTag: "bhagyaUpad" } } },
+          [Op.and]: [
+            {
+              [Op.or]: [
+                { expense_source: "bhagyaUpad" },
+                { labour_contract: { [Op.contains]: { sourceTag: "bhagyaUpad" } } },
+              ],
+            },
+            fyOrLegacyDate,
           ],
         },
         raw: true,
