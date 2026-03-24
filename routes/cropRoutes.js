@@ -3,7 +3,7 @@ const router = express.Router();
 const { Crop, Expense, Income, FarmerProfile, mapCrop, sequelize } = require("../models");
 const auth = require("../middleware/authMiddleware");
 const { Op } = require("sequelize");
-const { getFinancialYearFromDate, parseFinancialYear, sortFinancialYearsDesc } = require("../utils/financialYear");
+const { getFinancialYearFromDate, sortFinancialYearsDesc } = require("../utils/financialYear");
 
 const asyncHandler = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
@@ -117,8 +117,9 @@ router.get(
       ? financialYear
       : (Number(financialYear) ? `${financialYear}-${String((Number(financialYear) + 1) % 100).padStart(2, "0")}` : getFinancialYearFromDate());
 
-    const range = parseFinancialYear(year);
-    const dateWhere = range ? { date: { [Op.gte]: range.startDate, [Op.lte]: range.endDate } } : {};
+    // Extra income/expense (no crop): use expenses.year / incomes.year = FY (same as analytics),
+    // not calendar date range — so સામાન્ય ખર્ચ with correct FY is never missed.
+    const fyWhere = { user_id: userId, year };
 
     const crops = await Crop.findAll({
       where: { user_id: userId, year },
@@ -130,7 +131,6 @@ router.get(
     // Crop-linked income/expense: include all transactions for this year's crops (by crop year, not transaction date)
     // so that when user selects 2026-27, expenses added for 2026-27 crops show and totals are correct
     const cropLinkedWhere = { user_id: userId, crop_id: { [Op.in]: cropIds } };
-    const baseWhere = { user_id: userId, ...dateWhere };
     let cropIncomeTotal = 0;
     let cropExpenseTotal = 0;
     const expenseMap = {};
@@ -195,23 +195,23 @@ router.get(
     const [extraIncomeRow, tractorIncomeRow, extraExpenseRow, bhagyaUpadRow] = await Promise.all([
       Income.findOne({
         attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total"]],
-        where: { ...baseWhere, crop_id: null },
+        where: { ...fyWhere, crop_id: null },
         raw: true,
       }),
       Income.findOne({
         attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total"]],
-        where: { ...baseWhere, crop_id: null, category: "Rental Income" },
+        where: { ...fyWhere, crop_id: null, category: "Rental Income" },
         raw: true,
       }),
       Expense.findOne({
         attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total"]],
-        where: { ...baseWhere, crop_id: null, category: { [Op.ne]: "Labour" } },
+        where: { ...fyWhere, crop_id: null, category: { [Op.ne]: "Labour" } },
         raw: true,
       }),
       Expense.findOne({
         attributes: [[sequelize.fn("SUM", sequelize.col("amount")), "total"]],
         where: {
-          ...baseWhere,
+          ...fyWhere,
           crop_id: null,
           category: "Labour",
           [Op.or]: [
