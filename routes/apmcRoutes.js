@@ -5,8 +5,9 @@
  * Optional: DATA_GOV_IN_RESOURCE_ID (default is mandi daily price resource).
  */
 const express = require("express");
-const axios = require("axios");
 const auth = require("../middleware/authMiddleware");
+const { Income, Crop } = require("../models");
+const { getFinancialYearFromDate } = require("../utils/financialYear");
 const {
   getStoredApmcPrices,
   syncApmcDailyPrices,
@@ -15,31 +16,52 @@ const {
 
 const router = express.Router();
 
-const RESOURCE_ID =
-  process.env.DATA_GOV_IN_RESOURCE_ID ||
-  "9ef84268-d588-465a-a308-a864a43d0070";
 const API_KEY = process.env.DATA_GOV_IN_API_KEY || "";
-const DATA_GOV_API = "https://data.gov.in/api/datastore";
 
 const asyncHandler = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
 
-// data.gov.in can be slow; avoid frequent repeat calls from the app UI
-const APMC_TIMEOUT_MS = Number(process.env.APMC_TIMEOUT_MS || 45000);
-const APMC_CACHE_TTL_MS = Number(process.env.APMC_CACHE_TTL_MS || 5 * 60 * 1000); // 5 minutes
-const apmcCache = new Map(); // key=url -> { ts, payload }
-const getCached = (key) => {
-  const v = apmcCache.get(key);
-  if (!v) return null;
-  if (Date.now() - v.ts > APMC_CACHE_TTL_MS) {
-    apmcCache.delete(key);
-    return null;
-  }
-  return v.payload;
-};
-const setCached = (key, payload) => {
-  apmcCache.set(key, { ts: Date.now(), payload });
-};
+async function getUserSaleFallback(userId, selectedCommodity) {
+  const fy = getFinancialYearFromDate(new Date());
+  const rows = await Income.findAll({
+    where: {
+      user_id: userId,
+      category: "Crop Sale",
+      year: fy,
+    },
+    include: [{ model: Crop, attributes: ["crop_name"], required: false }],
+    order: [["date", "DESC"]],
+    limit: 60,
+  });
+
+  const mapped = rows
+    .map((r) => {
+      const sale = r.crop_sale || {};
+      const cropName = r.Crop?.crop_name || "";
+      const pricePerKg = Number(sale.pricePerKg ?? sale.pricePerUnit ?? 0);
+      const marketName = sale.marketName || sale.market || "તમારો વેચાણ ભાવ";
+      if (!cropName || !(pricePerKg > 0)) return null;
+      const modalPricePerQuintal = +(pricePerKg * 100).toFixed(2);
+      return {
+        state: "Gujarat",
+        district: "Local",
+        market: marketName,
+        commodity: cropName,
+        variety: sale.variety || "",
+        arrival_date: r.date || null,
+        min_price: modalPricePerQuintal,
+        max_price: modalPricePerQuintal,
+        modal_price: modalPricePerQuintal,
+      };
+    })
+    .filter(Boolean);
+
+  const filtered = selectedCommodity
+    ? mapped.filter((m) => String(m.commodity).toLowerCase() === String(selectedCommodity).toLowerCase())
+    : mapped;
+
+  return filtered;
+}
 
 /**
  * GET /api/apmc/prices
@@ -75,15 +97,25 @@ router.get(
       });
     }
 
-    // DB-only response path (no live API call in request path).
-    const payload = {
+    // Fallback when snapshot is empty: show user's recent crop-sale derived rates.
+    const userFallback = await getUserSaleFallback(req.user.id, commodity);
+    if (userFallback.length > 0) {
+      return res.json({
+        success: true,
+        data: userFallback.slice(Number(offset) || 0, (Number(offset) || 0) + Math.min(Number(limit) || 50, 100)),
+        count: userFallback.length,
+        source: "user-sales-fallback",
+        message: "APMC snapshot not ready; showing your recent crop sale rates.",
+      });
+    }
+
+    return res.json({
       success: true,
       data: [],
       count: 0,
       source: "db-empty",
       message: "APMC snapshot not ready yet. Trigger /api/apmc/sync-now or wait for startup bootstrap/night scheduler.",
-    };
-    return res.json(payload);
+    });
   })
 );
 
