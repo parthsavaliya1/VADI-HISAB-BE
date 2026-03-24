@@ -435,6 +435,42 @@ const Location = sequelize.define(
   { tableName: "locations", timestamps: false }
 );
 
+// ─── APMC Daily Price Snapshot ────────────────────────────────────────────────
+const ApmcDailyPrice = sequelize.define(
+  "ApmcDailyPrice",
+  {
+    id: {
+      type: Sequelize.UUID,
+      defaultValue: Sequelize.UUIDV4,
+      primaryKey: true,
+    },
+    snapshot_date: { type: Sequelize.DATEONLY, allowNull: false },
+    arrival_date: { type: Sequelize.STRING(20), allowNull: true, defaultValue: null },
+    state: { type: Sequelize.STRING(80), allowNull: false, defaultValue: "Gujarat" },
+    district: { type: Sequelize.STRING(120), allowNull: false },
+    market: { type: Sequelize.STRING(160), allowNull: false },
+    commodity: { type: Sequelize.STRING(120), allowNull: false },
+    variety: { type: Sequelize.STRING(120), allowNull: true, defaultValue: null },
+    min_price: { type: Sequelize.DECIMAL(12, 2), allowNull: true, defaultValue: null },
+    max_price: { type: Sequelize.DECIMAL(12, 2), allowNull: true, defaultValue: null },
+    modal_price: { type: Sequelize.DECIMAL(12, 2), allowNull: true, defaultValue: null },
+    raw_record: { type: Sequelize.JSONB, allowNull: false, defaultValue: {} },
+  },
+  {
+    tableName: "apmc_daily_prices",
+    indexes: [
+      { name: "idx_apmc_snapshot_date", fields: ["snapshot_date"] },
+      { name: "idx_apmc_state_district", fields: ["state", "district"] },
+      { name: "idx_apmc_commodity", fields: ["commodity"] },
+      {
+        name: "uq_apmc_day_state_dist_mkt_cmd_var",
+        unique: true,
+        fields: ["snapshot_date", "state", "district", "market", "commodity", "variety"],
+      },
+    ],
+  }
+);
+
 module.exports = {
   sequelize,
   Sequelize,
@@ -447,6 +483,7 @@ module.exports = {
   Notification,
   PushToken,
   Location,
+  ApmcDailyPrice,
   toApiShape,
   mapRow,
   mapCrop,

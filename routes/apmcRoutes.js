@@ -7,6 +7,11 @@
 const express = require("express");
 const axios = require("axios");
 const auth = require("../middleware/authMiddleware");
+const {
+  getStoredApmcPrices,
+  syncApmcDailyPrices,
+  getLatestSnapshotDate,
+} = require("../services/apmcSyncService");
 
 const router = express.Router();
 
@@ -53,31 +58,46 @@ router.get(
       });
     }
     const { state, district, commodity, market, limit = 50, offset = 0 } = req.query;
-    const params = new URLSearchParams({
-      "api-key": API_KEY,
-      "resource_id": RESOURCE_ID,
-      limit: Math.min(Number(limit) || 50, 100),
-      offset: Number(offset) || 0,
+
+    // Primary source: DB snapshot (fast, reliable).
+    const stored = await getStoredApmcPrices({
+      state,
+      district,
+      commodity,
+      market,
+      limit,
+      offset,
     });
-    if (state) params.append("filters[state]", state);
-    if (district) params.append("filters[district]", district);
-    if (commodity) params.append("filters[commodity]", commodity);
-    if (market) params.append("filters[market]", market);
+    if ((stored?.count || 0) > 0) {
+      return res.json({
+        ...stored,
+        source: "db",
+      });
+    }
 
-    const url = `${DATA_GOV_API}/resource.json?${params.toString()}`;
-    const cached = getCached(url);
-    if (cached) return res.json(cached);
-
-    const response = await axios.get(url, { timeout: APMC_TIMEOUT_MS });
-    const data = response.data;
-    const records = Array.isArray(data?.records) ? data.records : data?.data || [];
+    // DB-only response path (no live API call in request path).
     const payload = {
       success: true,
-      data: records,
-      count: records.length,
+      data: [],
+      count: 0,
+      source: "db-empty",
+      message: "APMC snapshot not ready yet. Trigger /api/apmc/sync-now or wait for startup bootstrap/night scheduler.",
     };
-    setCached(url, payload);
-    res.json(payload);
+    return res.json(payload);
+  })
+);
+
+/**
+ * POST /api/apmc/sync-now
+ * Manual snapshot trigger (for admin/testing) to save today's APMC data in DB.
+ */
+router.post(
+  "/sync-now",
+  auth,
+  asyncHandler(async (req, res) => {
+    const result = await syncApmcDailyPrices(new Date());
+    const snapshotDate = await getLatestSnapshotDate();
+    res.json({ success: true, ...result, snapshotDate });
   })
 );
 

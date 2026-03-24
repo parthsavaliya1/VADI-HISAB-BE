@@ -15,6 +15,11 @@ const locationRoutes = require("./routes/locationRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const apmcRoutes = require("./routes/apmcRoutes");
 const pushRoutes = require("./routes/pushRoutes");
+const {
+  startApmcDailyScheduler,
+  bootstrapApmcSnapshot,
+  getLatestSnapshotDate,
+} = require("./services/apmcSyncService");
 
 const app = express();
 
@@ -43,6 +48,18 @@ const PORT = process.env.PORT || 8000;
 
 connectDB()
   .then(() => {
+    startApmcDailyScheduler();
+    // On startup, fill APMC snapshot once if table is empty.
+    setTimeout(async () => {
+      try {
+        const latest = await getLatestSnapshotDate();
+        if (!latest) {
+          await bootstrapApmcSnapshot(new Date());
+        }
+      } catch (e) {
+        console.error("[APMC Bootstrap] startup error:", e.message);
+      }
+    }, 2000);
     app.listen(PORT, () => {
       console.log("Server running on port", PORT);
     });
