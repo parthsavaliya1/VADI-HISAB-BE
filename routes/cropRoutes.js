@@ -16,6 +16,27 @@ const getBhagmaShareRatio = (pct) => {
   return n / 100;
 };
 
+/** ચોથા ભાગ (~25%): ખર્ચ = બિયારણ+ખાતર+દવા+ટ્રેક્ટર + વેચણ પરનો ભાગ્યા હિસ્સો (મજૂરી લાઇન નહીં). */
+function isChothaBhagmaPct(pct) {
+  const n = Number(pct);
+  return Number.isFinite(n) && Math.abs(n - 25) < 1;
+}
+
+/** ત્રિજા / બીજા ભાગ: ખર્ચ = બિયારણ+ખાતર+દવા+ટ્રેક્ટર+નોંધેલી મજૂરી (કુલ ખર્ચ). */
+function isTrijaOrBijaBhagmaPct(pct) {
+  const n = Number(pct);
+  if (!Number.isFinite(n)) return false;
+  const trija =
+    Math.abs(n - 33) < 2 || Math.abs(n - 33.33) < 1.5;
+  const bija = Math.abs(n - 50) < 1;
+  return trija || bija;
+}
+
+function isBijaBhagmaPct(pct) {
+  const n = Number(pct);
+  return Number.isFinite(n) && Math.abs(n - 50) < 1;
+}
+
 router.post(
   "/",
   auth,
@@ -208,7 +229,7 @@ router.get(
 
     const totalArea = crops.reduce((sum, c) => sum + (parseFloat(c.area) || 0), 0);
 
-    // Per-crop: for bhagma, expense = 25% of profit + biyaran + khatar + jantunasak (Seed+Fertilizer+Pesticide)
+    // Per-crop: for bhagma — ચોથા ભાગે વેચણ હિસ્સો+ઇનપુટ; ત્રિજા/બીજા ભાગે કુલ ખર્ચ (ઇનપુટ+મજૂરી નોંધ)
     const cropReports = crops.map((crop) => {
       const id = crop.id;
       const income = incomeMap[id] ?? 0;
@@ -225,12 +246,23 @@ router.get(
         farmerDirectExpense = FARMER_DIRECT_CATEGORIES.reduce((s, cat) => s + (byCat[cat] || 0), 0);
         // Crop expense for bhagma includes tractor (Machinery) so it is calculated and shown in crop summary
         const bhagmaCropExpense = BHAGMA_CROP_EXPENSE_CATEGORIES.reduce((s, cat) => s + (byCat[cat] || 0), 0);
-        // Labour share only on વેચણ (Crop Sale), not on સબસિડી (Subsidy) or other income
         const incomeByCat = incomeByCropCategory[id] || {};
         const cropSaleIncome = incomeByCat["Crop Sale"] || 0;
-        labourShare = shareRatio * cropSaleIncome;
-        // Final expense = biyaran + khatar + jantunasak + tractor (Machinery) + labour share
-        expense = bhagmaCropExpense + labourShare;
+        const labourActual = byCat["Labour"] || 0;
+        const pct = crop.bhagma_percentage != null ? Number(crop.bhagma_percentage) : NaN;
+
+        if (isChothaBhagmaPct(pct)) {
+          // ચોથા ભાગ: વેચણ પરનો હિસ્સો (જથવા); મજૂરી અલગ ભાગ્યા ઉપાડમાં
+          labourShare = shareRatio * cropSaleIncome;
+          expense = bhagmaCropExpense + labourShare;
+        } else if (isTrijaOrBijaBhagmaPct(pct)) {
+          // ત્રિજા/બીજા ભાગ: ખર્ચ = બિયારણ+ખાતર+દવા+ટ્રેક્ટર+નોંધેલી મજૂરી (કુલ)
+          expense = bhagmaCropExpense + labourActual;
+          labourShare = null;
+        } else {
+          labourShare = shareRatio * cropSaleIncome;
+          expense = bhagmaCropExpense + labourShare;
+        }
         profit = income - expense; // farmer's net (total income minus expense)
       } else {
         expense = expenseMap[id] ?? 0;
@@ -241,6 +273,24 @@ router.get(
       const out = { ...row, income, expense, profit };
       if (labourShare != null) out.labourShare = Math.round(labourShare * 100) / 100;
       if (farmerDirectExpense != null) out.farmerDirectExpense = Math.round(farmerDirectExpense * 100) / 100;
+      // પાક મહિતી / ભાગ્યા નો ઉપાડ — ચોથા: આવકનો 25%; ત્રિજા/બીજા: કુલ ખર્ચ પછીના નફાનો ભાગ (0.33 / 0.5)
+      if (isBhagma) {
+        const rawExpenseTotal = expenseMap[id] ?? 0;
+        const inc = income;
+        const netProfit = inc - rawExpenseTotal;
+        const pct = crop.bhagma_percentage != null ? Number(crop.bhagma_percentage) : NaN;
+        let bhagmaAavelaPaisa;
+        if (isChothaBhagmaPct(pct)) {
+          bhagmaAavelaPaisa = inc * 0.25;
+        } else if (isTrijaOrBijaBhagmaPct(pct)) {
+          const partnerShare = isBijaBhagmaPct(pct) ? 0.5 : 0.33;
+          bhagmaAavelaPaisa = netProfit * partnerShare;
+        } else {
+          const cropSaleIncome = (incomeByCropCategory[id] || {})["Crop Sale"] || 0;
+          bhagmaAavelaPaisa = getBhagmaShareRatio(pct) * cropSaleIncome;
+        }
+        out.bhagmaAavelaPaisa = Math.round(bhagmaAavelaPaisa * 100) / 100;
+      }
       return out;
     });
 
