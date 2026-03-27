@@ -15,6 +15,7 @@ const locationRoutes = require("./routes/locationRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const apmcRoutes = require("./routes/apmcRoutes");
 const pushRoutes = require("./routes/pushRoutes");
+const storeAdRoutes = require("./routes/storeAdRoutes");
 const {
   startApmcDailyScheduler,
   bootstrapApmcSnapshot,
@@ -39,6 +40,7 @@ app.use("/api/locations", locationRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/apmc", apmcRoutes);
 app.use("/api/push", pushRoutes);
+app.use("/api/store-ads", storeAdRoutes);
 
 app.get("/", (req, res) => {
   res.send("Farmer App API Running 🌾");

@@ -80,7 +80,6 @@ router.post(
     // Token currently guarantees user id; fetch role from DB for authorization.
     if (sendToAll) {
       const currentUser = await User.findByPk(req.user.id, { attributes: ["id", "role"] });
-      console.log("Test",currentUser)
       if (!currentUser || currentUser.role !== "admin") {
         return res.status(403).json({
           success: false,

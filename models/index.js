@@ -333,6 +333,31 @@ const PushToken = sequelize.define(
 User.hasMany(PushToken, { foreignKey: "user_id" });
 PushToken.belongsTo(User, { foreignKey: "user_id" });
 
+// ─── Store Advertisement (dashboard carousel: image/video) ───────────────────
+const StoreAd = sequelize.define(
+  "StoreAd",
+  {
+    id: {
+      type: Sequelize.UUID,
+      defaultValue: Sequelize.UUIDV4,
+      primaryKey: true,
+    },
+    title: { type: Sequelize.STRING(160), allowNull: false },
+    subtitle: { type: Sequelize.STRING(320), allowNull: true, defaultValue: null },
+    media_type: { type: Sequelize.STRING(20), allowNull: false, defaultValue: "image" }, // image | video
+    media_url: { type: Sequelize.TEXT, allowNull: false },
+    thumbnail_url: { type: Sequelize.TEXT, allowNull: true, defaultValue: null }, // useful for video cards
+    redirect_url: { type: Sequelize.TEXT, allowNull: true, defaultValue: null }, // tap target
+    placement: { type: Sequelize.STRING(40), allowNull: false, defaultValue: "dashboard" },
+    status: { type: Sequelize.STRING(20), allowNull: false, defaultValue: "Active" }, // Active | Inactive
+    sort_order: { type: Sequelize.INTEGER, allowNull: false, defaultValue: 0 },
+    starts_at: { type: Sequelize.DATE, allowNull: true, defaultValue: null },
+    ends_at: { type: Sequelize.DATE, allowNull: true, defaultValue: null },
+    meta: { type: Sequelize.JSONB, allowNull: false, defaultValue: {} },
+  },
+  { tableName: "store_ads" }
+);
+
 // ─── Map Sequelize row to API shape (camelCase + _id) ─────────────────────────
 function mapRow(row) {
   if (!row) return null;
@@ -405,6 +430,19 @@ function mapNotification(row) {
   o.referenceId = o.referenceId ?? row.reference_id;
   o.isRead = o.isRead ?? row.is_read;
   o.readAt = o.readAt ?? row.read_at;
+  return o;
+}
+
+function mapStoreAd(row) {
+  const o = mapRow(row);
+  if (!o) return o;
+  o.mediaType = o.mediaType ?? row.media_type;
+  o.mediaUrl = o.mediaUrl ?? row.media_url;
+  o.thumbnailUrl = o.thumbnailUrl ?? row.thumbnail_url;
+  o.redirectUrl = o.redirectUrl ?? row.redirect_url;
+  o.sortOrder = o.sortOrder ?? row.sort_order;
+  o.startsAt = o.startsAt ?? row.starts_at;
+  o.endsAt = o.endsAt ?? row.ends_at;
   return o;
 }
 
@@ -482,6 +520,7 @@ module.exports = {
   ServiceLedger,
   Notification,
   PushToken,
+  StoreAd,
   Location,
   ApmcDailyPrice,
   toApiShape,
@@ -490,4 +529,5 @@ module.exports = {
   mapIncome,
   mapExpense,
   mapNotification,
+  mapStoreAd,
 };
