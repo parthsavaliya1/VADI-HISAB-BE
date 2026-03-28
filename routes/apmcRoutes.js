@@ -13,6 +13,17 @@ const {
   syncApmcDailyPrices,
   getLatestSnapshotDate,
 } = require("../services/apmcSyncService");
+const {
+  fetchListState,
+  fetchMarketReportDaily,
+  filterListStateByRegion,
+} = require("../services/agmarknetService");
+
+const AGMARKNET_DEFAULT_REGION =
+  String(process.env.AGMARKNET_DEFAULT_REGION || "saurashtra").toLowerCase() ===
+  "all"
+    ? "all"
+    : "saurashtra";
 
 const router = express.Router();
 
@@ -148,6 +159,87 @@ router.get(
   auth,
   (req, res) => {
     res.json({ success: true, data: COMMON_COMMODITIES });
+  }
+);
+
+/**
+ * POST /api/apmc/agmarknet/list-state
+ * Proxies AGMARKNET v1 list-state (markets + commodities per state).
+ * Body: { stateIds?: number[], region?: "saurashtra" | "all" }
+ * — stateIds defaults to [11] (Gujarat); region defaults to saurashtra (Kathiawar markets only).
+ * Set region "all" for every Gujarat market. Override default with env AGMARKNET_DEFAULT_REGION=all.
+ */
+router.post(
+  "/agmarknet/list-state",
+  auth,
+  async (req, res) => {
+    try {
+      const rawRegion = req.body?.region;
+      const region =
+        rawRegion == null || rawRegion === ""
+          ? AGMARKNET_DEFAULT_REGION
+          : String(rawRegion).toLowerCase() === "all"
+            ? "all"
+            : "saurashtra";
+
+      const data = await fetchListState(req.body?.stateIds);
+      const { list, marketsBefore, marketsAfter } = filterListStateByRegion(
+        data,
+        region
+      );
+      res.json({
+        success: true,
+        data: list,
+        count: list.length,
+        region,
+        marketsBefore,
+        marketsAfter,
+      });
+    } catch (e) {
+      const status =
+        e.status && e.status >= 400 && e.status < 600
+          ? e.status
+          : e.response?.status >= 400 && e.response?.status < 600
+            ? e.response.status
+            : 502;
+      res.status(status).json({
+        success: false,
+        message: e.message || "AGMARKNET list-state failed",
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/apmc/agmarknet/market-report/daily
+ * AGMARKNET market-wise daily prices for selected mandi(s).
+ * Body: { date: "YYYY-MM-DD", marketIds: number[], stateIds?: number[], includeExcel?: boolean }
+ */
+router.post(
+  "/agmarknet/market-report/daily",
+  auth,
+  async (req, res) => {
+    try {
+      const body = req.body || {};
+      const data = await fetchMarketReportDaily({
+        date: body.date,
+        marketIds: body.marketIds,
+        stateIds: body.stateIds,
+        includeExcel: body.includeExcel,
+      });
+      res.json({ success: true, data });
+    } catch (e) {
+      const status =
+        e.status && e.status >= 400 && e.status < 600
+          ? e.status
+          : e.response?.status >= 400 && e.response?.status < 600
+            ? e.response.status
+            : 502;
+      res.status(status).json({
+        success: false,
+        message: e.message || "AGMARKNET market-report daily failed",
+      });
+    }
   }
 );
 
