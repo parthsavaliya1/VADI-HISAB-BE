@@ -12,6 +12,10 @@ const {
   getStoredApmcPrices,
   syncApmcDailyPrices,
   getLatestSnapshotDate,
+  getApmcBulletin,
+  getDistinctSnapshotDates,
+  getLatestSnapshotDateForFilter,
+  ingestManualApmcRecords,
 } = require("../services/apmcSyncService");
 
 const router = express.Router();
@@ -66,22 +70,64 @@ async function getUserSaleFallback(userId, selectedCommodity) {
 /**
  * GET /api/apmc/prices
  * Query: state, district, commodity, market, limit (default 50), offset (default 0)
- * Proxies to data.gov.in and returns records with Arrival_Date, State, District, Market, Commodity, Variety, Min_Price, Max_Price, Modal_Price.
+ * Reads latest daily snapshot from PostgreSQL (filled by cron + data.gov.in). No live call per request.
  */
+/**
+ * GET /api/apmc/snapshot-dates?state=Gujarat&district=Rajkot
+ * Dates that have APMC rows for this district (newest first).
+ */
+router.get(
+  "/snapshot-dates",
+  auth,
+  asyncHandler(async (req, res) => {
+    const state = req.query.state || "Gujarat";
+    const district = req.query.district;
+    if (!district) {
+      return res.status(400).json({ success: false, message: "district is required" });
+    }
+    const data = await getDistinctSnapshotDates({ state, district });
+    res.json({ success: true, data });
+  }),
+);
+
+/**
+ * GET /api/apmc/bulletin?state=Gujarat&district=Rajkot&date=2026-03-21
+ * All crops for one district + snapshot day (aggregated across mandis).
+ */
+router.get(
+  "/bulletin",
+  auth,
+  asyncHandler(async (req, res) => {
+    const state = req.query.state || "Gujarat";
+    const district = req.query.district;
+    if (!district) {
+      return res.status(400).json({ success: false, message: "district is required" });
+    }
+    let date = req.query.date || null;
+    if (!date) {
+      date = await getLatestSnapshotDateForFilter({ state, district });
+    }
+    if (!date) {
+      return res.json({
+        success: true,
+        data: [],
+        count: 0,
+        snapshotDate: null,
+        message: "No APMC snapshot for this district yet. Run sync on the server.",
+      });
+    }
+    const out = await getApmcBulletin({ state, district, snapshotDate: date });
+    res.json({ ...out, source: "db-bulletin" });
+  }),
+);
+
 router.get(
   "/prices",
   auth,
   asyncHandler(async (req, res) => {
-    if (!API_KEY) {
-      return res.status(503).json({
-        success: false,
-        message:
-          "APMC price API not configured. Set DATA_GOV_IN_API_KEY in server .env (get key from data.gov.in).",
-      });
-    }
-    const { state, district, commodity, market, limit = 50, offset = 0 } = req.query;
+    const { state, district, commodity, market, limit = 50, offset = 0, date } = req.query;
 
-    // Primary source: DB snapshot (fast, reliable).
+    // Primary source: DB snapshot (no data.gov.in call per request; API key only needed for sync).
     const stored = await getStoredApmcPrices({
       state,
       district,
@@ -89,6 +135,7 @@ router.get(
       market,
       limit,
       offset,
+      date,
     });
     if ((stored?.count || 0) > 0) {
       return res.json({
@@ -127,9 +174,48 @@ router.post(
   "/sync-now",
   auth,
   asyncHandler(async (req, res) => {
+    if (!API_KEY) {
+      return res.status(503).json({
+        success: false,
+        message:
+          "Sync requires DATA_GOV_IN_API_KEY in server .env (get key from data.gov.in).",
+      });
+    }
     const result = await syncApmcDailyPrices(new Date());
     const snapshotDate = await getLatestSnapshotDate();
     res.json({ success: true, ...result, snapshotDate });
+  })
+);
+
+/**
+ * POST /api/apmc/manual
+ * Body: { snapshotDate: "YYYY-MM-DD", records: [...] }
+ * Optional: state (default Gujarat), or per-row state.
+ * Upserts by snapshot + state + district + market + commodity + variety.
+ */
+router.post(
+  "/manual",
+  auth,
+  asyncHandler(async (req, res) => {
+    const snapshotDate = req.body.snapshotDate || req.body.snapshot_date;
+    const records = req.body.records || req.body.rows;
+    const defaultState = req.body.state || "Gujarat";
+    if (!snapshotDate || !Array.isArray(records)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid body. Send JSON: { \"snapshotDate\": \"2026-03-28\", \"records\": [ { \"district\", \"market\", \"commodity\", ... } ] }",
+      });
+    }
+    const out = await ingestManualApmcRecords({
+      snapshotDate,
+      records,
+      defaultState,
+    });
+    if (!out.success && out.saved === 0 && (out.errors?.length || out.message)) {
+      return res.status(400).json(out);
+    }
+    res.json({ success: true, ...out });
   })
 );
 

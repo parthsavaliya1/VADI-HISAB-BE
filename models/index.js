@@ -509,6 +509,40 @@ const ApmcDailyPrice = sequelize.define(
   }
 );
 
+// ─── Mandi prices (api.data.gov.in → mandi_prices) ────────────────────────────
+const MandiPrice = sequelize.define(
+  "MandiPrice",
+  {
+    id: { type: Sequelize.BIGINT, autoIncrement: true, primaryKey: true },
+    state: { type: Sequelize.TEXT, allowNull: false, defaultValue: "Gujarat" },
+    district: { type: Sequelize.TEXT, allowNull: false },
+    market: { type: Sequelize.TEXT, allowNull: false },
+    commodity: { type: Sequelize.TEXT, allowNull: false },
+    variety: { type: Sequelize.TEXT, allowNull: true },
+    grade: { type: Sequelize.TEXT, allowNull: true },
+    arrival_date: { type: Sequelize.DATEONLY, allowNull: false },
+    min_price: { type: Sequelize.DECIMAL(12, 2), allowNull: true },
+    max_price: { type: Sequelize.DECIMAL(12, 2), allowNull: true },
+    modal_price: { type: Sequelize.DECIMAL(12, 2), allowNull: true },
+  },
+  {
+    tableName: "mandi_prices",
+    timestamps: true,
+    createdAt: "created_at",
+    updatedAt: false,
+    indexes: [
+      { fields: ["arrival_date"], name: "idx_mandi_date" },
+      { fields: ["district"], name: "idx_mandi_district" },
+      { fields: ["commodity"], name: "idx_mandi_commodity" },
+      {
+        unique: true,
+        fields: ["district", "market", "commodity", "variety", "grade", "arrival_date"],
+        name: "uq_mandi_district_market_commodity_variety_grade_arrival",
+      },
+    ],
+  }
+);
+
 module.exports = {
   sequelize,
   Sequelize,
@@ -523,6 +557,7 @@ module.exports = {
   StoreAd,
   Location,
   ApmcDailyPrice,
+  MandiPrice,
   toApiShape,
   mapRow,
   mapCrop,

@@ -14,6 +14,7 @@ const serviceLedgerRoutes = require("./routes/serviceLedgerRoutes");
 const locationRoutes = require("./routes/locationRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const apmcRoutes = require("./routes/apmcRoutes");
+const mandiRoutes = require("./routes/mandiRoutes");
 const pushRoutes = require("./routes/pushRoutes");
 const storeAdRoutes = require("./routes/storeAdRoutes");
 const {
@@ -21,6 +22,7 @@ const {
   bootstrapApmcSnapshot,
   getLatestSnapshotDate,
 } = require("./services/apmcSyncService");
+const { startMandiDailyScheduler } = require("./services/mandiSyncService");
 
 const app = express();
 
@@ -39,6 +41,7 @@ app.use("/api/service-ledger", serviceLedgerRoutes);
 app.use("/api/locations", locationRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/apmc", apmcRoutes);
+app.use("/api/mandi", mandiRoutes);
 app.use("/api/push", pushRoutes);
 app.use("/api/store-ads", storeAdRoutes);
 
@@ -51,6 +54,7 @@ const PORT = process.env.PORT || 8000;
 connectDB()
   .then(() => {
     startApmcDailyScheduler();
+    startMandiDailyScheduler();
     // On startup, fill APMC snapshot once if table is empty.
     setTimeout(async () => {
       try {
